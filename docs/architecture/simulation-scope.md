@@ -1,0 +1,60 @@
+# Simulation Scope
+
+The V1 proving environment is a deterministic grid-world simulation. Its purpose is to test kernel behaviour, event design, replay, task assignment, worker constraints, and failure handling.
+
+The simulation is intentionally limited. It is not the product and should not define the long-term domain of the project.
+
+## Included in V1
+
+V1 includes:
+
+- Deterministic tick loop.
+- Grid map.
+- Resource node.
+- Storage depot.
+- Miner worker.
+- Hauler worker.
+- Battery level.
+- Structured event log.
+- Replay from event log.
+- Basic task assignment.
+- Initial objective: maintain stockpile.
+
+## Excluded from V1
+
+V1 excludes:
+
+- LLM planning.
+- Erlang/Elixir runtime.
+- Multi-region clustering.
+- Realistic robotics physics.
+- Combat.
+- Graphics-heavy UI.
+- Mars time.
+- Slime mould topology.
+- Advanced routing.
+- Dynamic hierarchy.
+
+## Initial Scenario Shape
+
+The initial objective is to maintain a stockpile at a storage depot. A miner worker extracts resources from a resource node. A hauler worker moves resources between locations. Battery level constrains action availability.
+
+The kernel should produce structured events for objective acceptance, task creation, task assignment, worker action, state changes, constraint violations, failures, and recovery decisions.
+
+## Determinism Requirements
+
+The tick loop should advance in deterministic steps. Worker action outcomes in V1 should be deterministic given the same initial state and event sequence. Any randomness introduced in later work must be controlled by explicit seed events or equivalent deterministic inputs.
+
+## Proving Value
+
+The grid world should provide enough complexity to expose coordination problems without introducing unnecessary domain noise. It should exercise:
+
+- State transition rules.
+- Task assignment.
+- Worker authority.
+- Battery constraints.
+- Failure reporting.
+- Replay.
+- Causal inspection.
+
+Features outside that proving value should be deferred.

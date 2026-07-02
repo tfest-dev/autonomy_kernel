@@ -1,0 +1,42 @@
+# Replay Model
+
+Replay is a core safety primitive for Autonomy Kernel, not just a logging feature. The system is planned so that execution can be reconstructed from an initial state and an event sequence.
+
+## Replay Goal
+
+The primary replay goal is:
+
+```text
+same initial state + same event sequence -> same final state
+```
+
+If replay produces a different final state, that difference should be treated as evidence of nondeterminism, an implementation defect, incompatible schema interpretation, or an incomplete event record.
+
+## Uses of Replay
+
+Replay is expected to support:
+
+- Debugging unexpected behaviour.
+- Validating deterministic equivalence.
+- Comparing behaviour across implementation changes.
+- Reconstructing incidents after failure.
+- Inspecting causal chains from objective to worker action.
+- Verifying that recovery actions produced the intended state transition.
+
+## Event Log as Input
+
+Replay should consume the accepted event log and initial state. Runtime-only state, transient process memory, or unrecorded external observations should not be required to reconstruct the result.
+
+This requirement influences event design: any observation or decision that can affect state must be recorded explicitly.
+
+## State Hashing
+
+State hashing may be introduced later to verify deterministic equivalence between live execution and replay. Hashes can provide compact checkpoints for detecting divergence, comparing runs, and validating state transitions.
+
+Hashing is not a substitute for structured events. It is a verification aid that depends on a deterministic state representation.
+
+## Replay Boundaries
+
+Replay should reconstruct the kernel-visible state and decision history. It does not need to reproduce wall-clock timing, incidental logging, process scheduling, or non-authoritative worker internals unless those details affected accepted state.
+
+The boundary between replayed state and external side effects must remain explicit.

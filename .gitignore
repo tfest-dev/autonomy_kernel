@@ -1,0 +1,12 @@
+/target/
+**/*.rs.bk
+Cargo.lock
+.env
+.env.*
+!.env.example
+.DS_Store
+.idea/
+.vscode/
+*.log
+artifacts/runs/*
+!artifacts/runs/.gitkeep
