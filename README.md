@@ -4,7 +4,7 @@ Autonomy Kernel is a deterministic control substrate for AI-operated distributed
 
 It allows high-level intent to be decomposed into bounded, traceable, semi-autonomous execution while preserving repeatability, auditability, failure isolation, and constraint enforcement.
 
-Status: initial scaffold. Core implementation has not started.
+Status: initial Rust workspace and deterministic world-state skeleton. Event sourcing, replay, scheduling, and integrations have not started.
 
 ## Project Purpose
 
@@ -68,9 +68,8 @@ The initial objective is to maintain a resource stockpile using a small set of w
 
 ## Non-Goals
 
-- No Rust implementation in WP00.
-- No LLM integration in WP00.
-- No runtime clustering in WP00.
+- No LLM integration in the current implementation
+- No runtime clustering in the current implementation.
 - No realistic robotics physics in V1.
 - No graphics-heavy user interface in V1.
 - No uncontrolled worker tool execution.
@@ -78,13 +77,13 @@ The initial objective is to maintain a resource stockpile using a small set of w
 
 ## Repository Status
 
-This repository currently contains the initial public documentation and directory scaffold for WP00. Core implementation, crate manifests, simulations, replay tooling, and integrations have not started.
+This repository currently contains the initial public documentation, Rust workspace, deterministic core primitives, and minimal grid-world state/reducer types. Full event sourcing, replay tooling, schedulers, planners, and integrations have not started.
 
 ## Roadmap Summary
 
-1. Define core event, state, objective, constraint, and task types.
-2. Implement a deterministic tick loop for the V1 proving environment.
-3. Add structured event logging and replay from recorded events.
+1. Refine core state and action types as event sourcing requirements become concrete.
+2. Add structured event logging for accepted state transitions.
+3. Add replay from recorded events and initial state.
 4. Add basic task assignment for miner and hauler workers.
-5. Add constraint checks for battery and worker authority.
+5. Add constraint checks beyond the initial reducer rules.
 6. Add audit views for causal inspection and failure diagnosis.

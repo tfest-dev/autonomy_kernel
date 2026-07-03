@@ -4,6 +4,8 @@ The V1 proving environment is a deterministic grid-world simulation. Its purpose
 
 The simulation is intentionally limited. It is not the product and should not define the long-term domain of the project.
 
+First deterministic Rust world-state skeleton introduced for the environment with: typed identifiers, ticks, positions, quantities, workers, resource nodes, storage, direct worker actions, and a pure reducer. It does not yet implement event sourcing, replay logs, schedulers, or planners. 
+
 ## Included in V1
 
 V1 includes:

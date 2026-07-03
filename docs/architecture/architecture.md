@@ -52,6 +52,15 @@ Workers do not redefine objectives, bypass policy, or directly mutate authoritat
 
 The world or external system is the environment affected by worker action. In V1, this is a deterministic grid-world simulation. Later environments may represent real services, infrastructure, devices, or other distributed systems.
 
+## Initial Crate Split
+
+The initial Rust workspace separates shared deterministic primitives from the V1 proving environment:
+
+  - `autonomy-core` contains typed identifiers, ticks, positions, quantities, and deterministic reducer errors.
+  - `autonomy-sim` contains grid-world entities, direct worker actions, world state, and the pure action reducer. 
+
+Future crates for replay, audit, and command-line workflows remain scaffolded but unimplemented. 
+
 ## Separation of Reasoning and Execution
 
 Reasoning is separated from execution by design. LLMs or other planners may propose, but they do not directly execute actions. Workers execute only bounded tasks. The kernel records decisions and state transitions as events.
