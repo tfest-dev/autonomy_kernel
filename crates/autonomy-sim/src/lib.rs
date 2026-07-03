@@ -3,6 +3,7 @@ pub mod assignment;
 pub mod entity;
 pub mod failure;
 pub mod objective;
+pub mod policy;
 pub mod reducer;
 pub mod scenario;
 pub mod task;
@@ -15,6 +16,7 @@ pub use entity::{
 };
 pub use failure::{FailureReason, RecoveryKind};
 pub use objective::{Objective, ObjectiveKind};
+pub use policy::{validate_action_policy, ActionPolicy, PolicyError};
 pub use reducer::apply_action;
 pub use scenario::{
     build_mining_bootstrap_world, mining_bootstrap_actions, mining_bootstrap_assignment,

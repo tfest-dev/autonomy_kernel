@@ -1,7 +1,10 @@
+use std::error::Error;
+use std::fmt;
+
 use autonomy_core::{AssignmentId, EventId, SimError, Tick, WorkerId};
 use autonomy_sim::{
-    apply_action, ActionContext, Assignment, Decision, FailureReason, Objective, RecoveryKind,
-    Task, WorkerAction, WorldState,
+    apply_action, validate_action_policy, ActionContext, ActionPolicy, Assignment, Decision,
+    FailureReason, Objective, PolicyError, RecoveryKind, Task, WorkerAction, WorldState,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -33,6 +36,15 @@ pub enum EventKind {
         worker_id: WorkerId,
         recovery: RecoveryKind,
     },
+    PolicyAccepted {
+        action: WorkerAction,
+        context: ActionContext,
+    },
+    PolicyRejected {
+        action: WorkerAction,
+        context: ActionContext,
+        error: PolicyError,
+    },
     ActionRequested {
         action: WorkerAction,
         context: ActionContext,
@@ -55,7 +67,9 @@ impl EventKind {
             Self::TaskAssigned { assignment } => Some(assignment.id),
             Self::ActionRequested { context, .. }
             | Self::ActionApplied { context, .. }
-            | Self::ActionRejected { context, .. } => context.assignment_id,
+            | Self::ActionRejected { context, .. }
+            | Self::PolicyAccepted { context, .. }
+            | Self::PolicyRejected { context, .. } => context.assignment_id,
             Self::ObjectiveAccepted { .. }
             | Self::DecisionEmitted { .. }
             | Self::TaskCreated { .. }
@@ -64,6 +78,23 @@ impl EventKind {
         }
     }
 }
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ExecutionError {
+    Policy(PolicyError),
+    Sim(SimError),
+}
+
+impl fmt::Display for ExecutionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Policy(error) => write!(f, "policy rejected action: {error}"),
+            Self::Sim(error) => write!(f, "action execution failed: {error}"),
+        }
+    }
+}
+
+impl Error for ExecutionError {}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EventLog {
@@ -163,6 +194,42 @@ pub fn record_action_with_context(
     }
 }
 
+pub fn record_action_with_policy(
+    state: &WorldState,
+    log: &mut EventLog,
+    action: WorkerAction,
+    assignment_id: Option<AssignmentId>,
+    policy: &ActionPolicy,
+) -> Result<WorldState, ExecutionError> {
+    let context = ActionContext { assignment_id };
+    let pre_action_tick = state.tick;
+
+    match validate_action_policy(state, &action, policy) {
+        Ok(()) => {
+            log.append(
+                pre_action_tick,
+                EventKind::PolicyAccepted {
+                    action: action.clone(),
+                    context,
+                },
+            );
+            record_action_with_context(state, log, action, assignment_id)
+                .map_err(ExecutionError::Sim)
+        }
+        Err(error) => {
+            log.append(
+                pre_action_tick,
+                EventKind::PolicyRejected {
+                    action,
+                    context,
+                    error: error.clone(),
+                },
+            );
+            Err(ExecutionError::Policy(error))
+        }
+    }
+}
+
 pub fn record_objective_accepted(
     log: &mut EventLog,
     tick: Tick,
@@ -250,4 +317,191 @@ pub fn events_for_assignment(
         .iter()
         .filter(|event| event.kind.assignment_id() == Some(assignment_id))
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use autonomy_core::{Position, Quantity, SimError, Tick};
+    use autonomy_sim::{
+        build_mining_bootstrap_world, ActionPolicy, PolicyError, WorkerAction,
+        MINING_BOOTSTRAP_ASSIGNMENT_ID, MINING_BOOTSTRAP_EXPECTED_STORAGE_IRON,
+        MINING_BOOTSTRAP_NODE_ID, MINING_BOOTSTRAP_WORKER_ID,
+    };
+
+    use crate::{
+        event_log::{record_action_with_policy, EventKind, EventLog, ExecutionError},
+        replay::replay_events,
+    };
+
+    #[test]
+    fn policy_rejection_records_policy_rejected_without_action_requested() {
+        let state = build_mining_bootstrap_world();
+        let before = state.clone();
+        let mut log = EventLog::new();
+        let policy = ActionPolicy {
+            max_mine_quantity: Some(Quantity::new(10)),
+            ..ActionPolicy::default()
+        };
+
+        let result = record_action_with_policy(
+            &state,
+            &mut log,
+            WorkerAction::Mine {
+                worker_id: MINING_BOOTSTRAP_WORKER_ID,
+                node_id: MINING_BOOTSTRAP_NODE_ID,
+                quantity: Quantity::new(20),
+            },
+            Some(MINING_BOOTSTRAP_ASSIGNMENT_ID),
+            &policy,
+        );
+
+        assert_eq!(
+            result,
+            Err(ExecutionError::Policy(
+                PolicyError::MineQuantityLimitExceeded {
+                    requested: Quantity::new(20),
+                    maximum: Quantity::new(10),
+                }
+            ))
+        );
+        assert_eq!(state, before);
+        assert_eq!(state.tick, Tick::ZERO);
+        assert_eq!(log.len(), 1);
+        assert!(matches!(
+            log.events()[0].kind,
+            EventKind::PolicyRejected { .. }
+        ));
+        assert!(!log
+            .events()
+            .iter()
+            .any(|event| matches!(event.kind, EventKind::ActionRequested { .. })));
+    }
+
+    #[test]
+    fn policy_accepted_successful_action_records_policy_requested_and_applied_events() {
+        let state = build_mining_bootstrap_world();
+        let mut log = EventLog::new();
+        let policy = ActionPolicy::default();
+
+        let next = record_action_with_policy(
+            &state,
+            &mut log,
+            WorkerAction::Move {
+                worker_id: MINING_BOOTSTRAP_WORKER_ID,
+                to: Position::new(1, 0),
+            },
+            Some(MINING_BOOTSTRAP_ASSIGNMENT_ID),
+            &policy,
+        )
+        .expect("policy-accepted move should apply");
+
+        assert_eq!(next.tick, Tick::new(1));
+        assert_eq!(log.len(), 3);
+        assert!(matches!(
+            log.events()[0].kind,
+            EventKind::PolicyAccepted { .. }
+        ));
+        assert!(matches!(
+            log.events()[1].kind,
+            EventKind::ActionRequested { .. }
+        ));
+        assert!(matches!(
+            log.events()[2].kind,
+            EventKind::ActionApplied { .. }
+        ));
+        assert_eq!(log.events()[0].tick, Tick::ZERO);
+        assert_eq!(log.events()[1].tick, Tick::ZERO);
+        assert_eq!(log.events()[2].tick, Tick::new(1));
+    }
+
+    #[test]
+    fn policy_accepted_reducer_failure_records_requested_and_rejected_events() {
+        let state = build_mining_bootstrap_world();
+        let mut log = EventLog::new();
+        let policy = ActionPolicy::default();
+
+        let result = record_action_with_policy(
+            &state,
+            &mut log,
+            WorkerAction::Move {
+                worker_id: MINING_BOOTSTRAP_WORKER_ID,
+                to: Position::new(9, 9),
+            },
+            Some(MINING_BOOTSTRAP_ASSIGNMENT_ID),
+            &policy,
+        );
+
+        assert!(matches!(
+            result,
+            Err(ExecutionError::Sim(SimError::NotAdjacent { .. }))
+        ));
+        assert_eq!(log.len(), 3);
+        assert!(matches!(
+            log.events()[0].kind,
+            EventKind::PolicyAccepted { .. }
+        ));
+        assert!(matches!(
+            log.events()[1].kind,
+            EventKind::ActionRequested { .. }
+        ));
+        assert!(matches!(
+            log.events()[2].kind,
+            EventKind::ActionRejected { .. }
+        ));
+        assert_eq!(log.events()[2].tick, state.tick);
+    }
+
+    #[test]
+    fn policy_rejection_replays_as_non_mutating_audit_fact() {
+        let state = build_mining_bootstrap_world();
+        let mut log = EventLog::new();
+        let policy = ActionPolicy {
+            max_mine_quantity: Some(Quantity::new(10)),
+            ..ActionPolicy::default()
+        };
+
+        let result = record_action_with_policy(
+            &state,
+            &mut log,
+            WorkerAction::Mine {
+                worker_id: MINING_BOOTSTRAP_WORKER_ID,
+                node_id: MINING_BOOTSTRAP_NODE_ID,
+                quantity: Quantity::new(20),
+            },
+            Some(MINING_BOOTSTRAP_ASSIGNMENT_ID),
+            &policy,
+        );
+
+        assert!(matches!(result, Err(ExecutionError::Policy(_))));
+        let replayed =
+            replay_events(&state, log.events()).expect("policy event replay should succeed");
+        assert_eq!(replayed, state);
+    }
+
+    #[test]
+    fn policy_accepted_action_replays_through_applied_action_event() {
+        let state = build_mining_bootstrap_world();
+        let mut log = EventLog::new();
+        let policy = ActionPolicy {
+            max_mine_quantity: Some(MINING_BOOTSTRAP_EXPECTED_STORAGE_IRON),
+            ..ActionPolicy::default()
+        };
+
+        let next = record_action_with_policy(
+            &state,
+            &mut log,
+            WorkerAction::Mine {
+                worker_id: MINING_BOOTSTRAP_WORKER_ID,
+                node_id: MINING_BOOTSTRAP_NODE_ID,
+                quantity: MINING_BOOTSTRAP_EXPECTED_STORAGE_IRON,
+            },
+            Some(MINING_BOOTSTRAP_ASSIGNMENT_ID),
+            &policy,
+        )
+        .expect("policy-accepted mine should apply");
+
+        let replayed =
+            replay_events(&state, log.events()).expect("policy event replay should succeed");
+        assert_eq!(replayed, next);
+    }
 }

@@ -124,7 +124,9 @@ pub fn replay_events(
             | EventKind::TaskCreated { .. }
             | EventKind::TaskAssigned { .. }
             | EventKind::FailureInjected { .. }
-            | EventKind::RecoveryEmitted { .. } => {
+            | EventKind::RecoveryEmitted { .. }
+            | EventKind::PolicyAccepted { .. }
+            | EventKind::PolicyRejected { .. } => {
                 validate_event_tick(event.id, state.tick, event.tick)?;
             }
             EventKind::ActionRequested { .. } => {

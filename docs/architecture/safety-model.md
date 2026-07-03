@@ -14,6 +14,8 @@ Actions should be constrained by schemas and policies. A proposed action that ca
 
 Unsafe actions should be unrepresentable where possible and rejected where representation is necessary for diagnosis.
 
+First deterministic action policy gate implemented. The current policy can enforce a minimum battery reserve, disable or allow worker disable/repair actions, and cap mine quantity. Policy checks are pure functions of state, action, and policy. Policy rejection is recorded as `PolicyRejected` and prevents reducer execution. This is separate from `ActionRejected`, which records a reducer-level state-rule failure after an action was attempted.
+
 ## Bounded Worker Authority
 
 Workers execute assigned tasks within bounded authority. They cannot redefine objectives, grant themselves additional permissions, bypass validation, or directly mutate authoritative state.
@@ -42,6 +44,8 @@ Failures should be represented explicitly and isolated to the smallest practical
 The system should avoid hidden partial success where possible. If partial progress affects state, it should be recorded.
 
 Failure recovery path records injected worker failure as a first-class audit event and applies disablement through the reducer. Recovery is recorded explicitly before a repair action is applied.
+
+Policy rejection is recorded as a first-class audit event. A policy-rejected action leaves state unchanged, does not advance tick, and does not produce an `ActionRequested` event.
 
 ## Audit and Diagnosis
 

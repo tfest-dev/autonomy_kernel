@@ -5,21 +5,24 @@ use autonomy_core::{Position, Quantity, ResourceNodeId, SimError, StorageId, Tic
 use autonomy_sim::{
     build_mining_bootstrap_world, mining_bootstrap_actions, mining_bootstrap_assignment,
     mining_bootstrap_decision, mining_bootstrap_objective, mining_bootstrap_task,
-    objective_satisfied, stockpile_quantity, ResourceKind, WorkerAction, WorkerStatus, WorldState,
-    MINING_BOOTSTRAP_ASSIGNMENT_ID, MINING_BOOTSTRAP_EXPECTED_FINAL_TICK,
+    objective_satisfied, stockpile_quantity, ActionPolicy, PolicyError, ResourceKind, WorkerAction,
+    WorkerStatus, WorldState, MINING_BOOTSTRAP_ASSIGNMENT_ID, MINING_BOOTSTRAP_EXPECTED_FINAL_TICK,
     MINING_BOOTSTRAP_EXPECTED_NODE_IRON, MINING_BOOTSTRAP_EXPECTED_STORAGE_IRON,
     MINING_BOOTSTRAP_NODE_ID, MINING_BOOTSTRAP_STORAGE_ID, MINING_BOOTSTRAP_WORKER_ID,
 };
 
 use crate::{
     event_log::{
-        record_action_with_context, record_decision_emitted, record_objective_accepted,
-        record_task_assigned, record_task_created, record_worker_failure, record_worker_recovery,
-        EventEnvelope, EventLog,
+        record_action_with_context, record_action_with_policy, record_decision_emitted,
+        record_objective_accepted, record_task_assigned, record_task_created,
+        record_worker_failure, record_worker_recovery, EventEnvelope, EventLog, ExecutionError,
     },
     replay::ReplayError,
     verification::verify_replay,
 };
+
+const POLICY_GATE_REJECTED_MINE_QUANTITY: Quantity = Quantity(20);
+const POLICY_GATE_EXPECTED_FINAL_TICK: Tick = Tick(2);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ScenarioRun {
@@ -31,8 +34,10 @@ pub struct ScenarioRun {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ScenarioError {
     ActionFailed(SimError),
+    PolicyFailed(PolicyError),
     ReplayFailed(ReplayError),
     ObjectiveNotSatisfied,
+    ExpectedPolicyRejectionMissing,
     ExpectedWorkerMissing(WorkerId),
     ExpectedResourceNodeMissing(ResourceNodeId),
     ExpectedStorageMissing(StorageId),
@@ -55,8 +60,12 @@ impl fmt::Display for ScenarioError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::ActionFailed(error) => write!(f, "scenario action failed: {error}"),
+            Self::PolicyFailed(error) => write!(f, "scenario policy check failed: {error}"),
             Self::ReplayFailed(error) => write!(f, "scenario replay failed: {error}"),
             Self::ObjectiveNotSatisfied => write!(f, "scenario objective is not satisfied"),
+            Self::ExpectedPolicyRejectionMissing => {
+                write!(f, "scenario expected a policy rejection that did not occur")
+            }
             Self::ExpectedWorkerMissing(worker_id) => {
                 write!(f, "expected worker missing: {}", worker_id.value())
             }
@@ -225,6 +234,78 @@ pub fn run_worker_failure_recovery() -> Result<ScenarioRun, ScenarioError> {
     })
 }
 
+pub fn run_policy_gate() -> Result<ScenarioRun, ScenarioError> {
+    let initial_state = build_mining_bootstrap_world();
+    let objective = mining_bootstrap_objective();
+    let mut final_state = initial_state.clone();
+    let mut log = EventLog::new();
+    let policy = policy_gate_policy();
+
+    record_objective_accepted(&mut log, initial_state.tick, objective.clone());
+    record_decision_emitted(&mut log, initial_state.tick, mining_bootstrap_decision());
+    record_task_created(&mut log, initial_state.tick, mining_bootstrap_task());
+    record_task_assigned(&mut log, initial_state.tick, mining_bootstrap_assignment());
+
+    match record_action_with_policy(
+        &final_state,
+        &mut log,
+        WorkerAction::Mine {
+            worker_id: MINING_BOOTSTRAP_WORKER_ID,
+            node_id: MINING_BOOTSTRAP_NODE_ID,
+            quantity: POLICY_GATE_REJECTED_MINE_QUANTITY,
+        },
+        Some(MINING_BOOTSTRAP_ASSIGNMENT_ID),
+        &policy,
+    ) {
+        Err(ExecutionError::Policy(PolicyError::MineQuantityLimitExceeded {
+            requested,
+            maximum,
+        })) if requested == POLICY_GATE_REJECTED_MINE_QUANTITY
+            && maximum == MINING_BOOTSTRAP_EXPECTED_STORAGE_IRON => {}
+        Err(ExecutionError::Policy(error)) => return Err(ScenarioError::PolicyFailed(error)),
+        Err(ExecutionError::Sim(error)) => return Err(ScenarioError::ActionFailed(error)),
+        Ok(_) => return Err(ScenarioError::ExpectedPolicyRejectionMissing),
+    }
+
+    for action in [
+        WorkerAction::Mine {
+            worker_id: MINING_BOOTSTRAP_WORKER_ID,
+            node_id: MINING_BOOTSTRAP_NODE_ID,
+            quantity: MINING_BOOTSTRAP_EXPECTED_STORAGE_IRON,
+        },
+        WorkerAction::Deposit {
+            worker_id: MINING_BOOTSTRAP_WORKER_ID,
+            storage_id: MINING_BOOTSTRAP_STORAGE_ID,
+        },
+    ] {
+        final_state = record_action_with_policy(
+            &final_state,
+            &mut log,
+            action,
+            Some(MINING_BOOTSTRAP_ASSIGNMENT_ID),
+            &policy,
+        )
+        .map_err(|error| match error {
+            ExecutionError::Policy(error) => ScenarioError::PolicyFailed(error),
+            ExecutionError::Sim(error) => ScenarioError::ActionFailed(error),
+        })?;
+    }
+
+    validate_policy_gate_final_state(&final_state)?;
+    if !objective_satisfied(&final_state, &objective, MINING_BOOTSTRAP_STORAGE_ID) {
+        return Err(ScenarioError::ObjectiveNotSatisfied);
+    }
+
+    verify_replay(&initial_state, log.events(), &final_state)
+        .map_err(ScenarioError::ReplayFailed)?;
+
+    Ok(ScenarioRun {
+        initial_state,
+        final_state,
+        events: log.events().to_vec(),
+    })
+}
+
 pub fn validate_mining_bootstrap_final_state(state: &WorldState) -> Result<(), ScenarioError> {
     let storage = state.storage.get(&MINING_BOOTSTRAP_STORAGE_ID).ok_or(
         ScenarioError::ExpectedStorageMissing(MINING_BOOTSTRAP_STORAGE_ID),
@@ -263,6 +344,51 @@ pub fn validate_mining_bootstrap_final_state(state: &WorldState) -> Result<(), S
     if state.tick != MINING_BOOTSTRAP_EXPECTED_FINAL_TICK {
         return Err(ScenarioError::TickMismatch {
             expected: MINING_BOOTSTRAP_EXPECTED_FINAL_TICK,
+            actual: state.tick,
+        });
+    }
+
+    Ok(())
+}
+
+pub fn validate_policy_gate_final_state(state: &WorldState) -> Result<(), ScenarioError> {
+    let storage = state.storage.get(&MINING_BOOTSTRAP_STORAGE_ID).ok_or(
+        ScenarioError::ExpectedStorageMissing(MINING_BOOTSTRAP_STORAGE_ID),
+    )?;
+    let storage_iron = storage
+        .inventory
+        .get(&ResourceKind::Iron)
+        .copied()
+        .unwrap_or(Quantity::ZERO);
+    if storage_iron != MINING_BOOTSTRAP_EXPECTED_STORAGE_IRON {
+        return Err(ScenarioError::StorageQuantityMismatch {
+            expected: MINING_BOOTSTRAP_EXPECTED_STORAGE_IRON,
+            actual: storage_iron,
+        });
+    }
+
+    let node = state.resource_nodes.get(&MINING_BOOTSTRAP_NODE_ID).ok_or(
+        ScenarioError::ExpectedResourceNodeMissing(MINING_BOOTSTRAP_NODE_ID),
+    )?;
+    if node.remaining != MINING_BOOTSTRAP_EXPECTED_NODE_IRON {
+        return Err(ScenarioError::ResourceQuantityMismatch {
+            expected: MINING_BOOTSTRAP_EXPECTED_NODE_IRON,
+            actual: node.remaining,
+        });
+    }
+
+    let worker = state.workers.get(&MINING_BOOTSTRAP_WORKER_ID).ok_or(
+        ScenarioError::ExpectedWorkerMissing(MINING_BOOTSTRAP_WORKER_ID),
+    )?;
+    if worker.carried.is_some() {
+        return Err(ScenarioError::WorkerStillCarrying(
+            MINING_BOOTSTRAP_WORKER_ID,
+        ));
+    }
+
+    if state.tick != POLICY_GATE_EXPECTED_FINAL_TICK {
+        return Err(ScenarioError::TickMismatch {
+            expected: POLICY_GATE_EXPECTED_FINAL_TICK,
             actual: state.tick,
         });
     }
@@ -327,11 +453,20 @@ pub fn mining_bootstrap_stockpile_quantity(state: &WorldState) -> Quantity {
     stockpile_quantity(state, MINING_BOOTSTRAP_STORAGE_ID, ResourceKind::Iron)
 }
 
+fn policy_gate_policy() -> ActionPolicy {
+    ActionPolicy {
+        min_battery_reserve: Some(Quantity::ONE),
+        allow_disable_worker: false,
+        allow_repair_worker: false,
+        max_mine_quantity: Some(MINING_BOOTSTRAP_EXPECTED_STORAGE_IRON),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use autonomy_core::{EventId, Position, Quantity, SimError, Tick};
     use autonomy_sim::{
-        build_mining_bootstrap_world, mining_bootstrap_objective, objective_satisfied,
+        build_mining_bootstrap_world, mining_bootstrap_objective, objective_satisfied, PolicyError,
         WorkerAction, WorkerStatus, MINING_BOOTSTRAP_ASSIGNMENT_ID,
         MINING_BOOTSTRAP_EXPECTED_FINAL_TICK, MINING_BOOTSTRAP_EXPECTED_NODE_IRON,
         MINING_BOOTSTRAP_EXPECTED_STORAGE_IRON, MINING_BOOTSTRAP_INITIAL_NODE_IRON,
@@ -346,8 +481,9 @@ mod tests {
         },
         replay::replay_events,
         scenario::{
-            mining_bootstrap_stockpile_quantity, run_mining_bootstrap, run_worker_failure_recovery,
-            validate_mining_bootstrap_final_state, validate_worker_failure_recovery_final_state,
+            mining_bootstrap_stockpile_quantity, run_mining_bootstrap, run_policy_gate,
+            run_worker_failure_recovery, validate_mining_bootstrap_final_state,
+            validate_policy_gate_final_state, validate_worker_failure_recovery_final_state,
         },
         verify_replay,
     };
@@ -796,6 +932,107 @@ mod tests {
     fn running_worker_failure_scenario_twice_produces_identical_events_and_final_state() {
         let first = run_worker_failure_recovery().expect("first run should succeed");
         let second = run_worker_failure_recovery().expect("second run should succeed");
+
+        assert_eq!(first.initial_state, second.initial_state);
+        assert_eq!(first.final_state, second.final_state);
+        assert_eq!(first.events, second.events);
+    }
+
+    #[test]
+    fn policy_gate_scenario_final_state_satisfies_stockpile_objective() {
+        let run = run_policy_gate().expect("policy gate scenario should run");
+        let objective = mining_bootstrap_objective();
+
+        assert!(objective_satisfied(
+            &run.final_state,
+            &objective,
+            MINING_BOOTSTRAP_STORAGE_ID
+        ));
+        validate_policy_gate_final_state(&run.final_state).expect("final state should validate");
+    }
+
+    #[test]
+    fn policy_gate_scenario_includes_policy_rejection_before_corrected_action() {
+        let run = run_policy_gate().expect("policy gate scenario should run");
+
+        assert_eq!(run.events.len(), 11);
+        assert!(matches!(
+            run.events[0].kind,
+            EventKind::ObjectiveAccepted { .. }
+        ));
+        assert!(matches!(
+            run.events[1].kind,
+            EventKind::DecisionEmitted { .. }
+        ));
+        assert!(matches!(run.events[2].kind, EventKind::TaskCreated { .. }));
+        assert!(matches!(run.events[3].kind, EventKind::TaskAssigned { .. }));
+        assert!(matches!(
+            run.events[4].kind,
+            EventKind::PolicyRejected {
+                error: PolicyError::MineQuantityLimitExceeded { .. },
+                ..
+            }
+        ));
+        assert!(matches!(
+            run.events[5].kind,
+            EventKind::PolicyAccepted {
+                action: WorkerAction::Mine {
+                    quantity: MINING_BOOTSTRAP_EXPECTED_STORAGE_IRON,
+                    ..
+                },
+                ..
+            }
+        ));
+        assert!(matches!(
+            run.events[6].kind,
+            EventKind::ActionRequested {
+                action: WorkerAction::Mine {
+                    quantity: MINING_BOOTSTRAP_EXPECTED_STORAGE_IRON,
+                    ..
+                },
+                ..
+            }
+        ));
+        assert!(matches!(
+            run.events[7].kind,
+            EventKind::ActionApplied {
+                action: WorkerAction::Mine {
+                    quantity: MINING_BOOTSTRAP_EXPECTED_STORAGE_IRON,
+                    ..
+                },
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn policy_gate_scenario_policy_and_action_events_retain_assignment_context() {
+        let run = run_policy_gate().expect("policy gate scenario should run");
+
+        for event in &run.events[4..] {
+            assert_eq!(
+                event.kind.assignment_id(),
+                Some(MINING_BOOTSTRAP_ASSIGNMENT_ID)
+            );
+        }
+    }
+
+    #[test]
+    fn policy_gate_scenario_replay_reproduces_final_state() {
+        let run = run_policy_gate().expect("policy gate scenario should run");
+
+        let replayed =
+            replay_events(&run.initial_state, &run.events).expect("replay should succeed");
+
+        assert_eq!(replayed, run.final_state);
+        verify_replay(&run.initial_state, &run.events, &run.final_state)
+            .expect("verification should pass");
+    }
+
+    #[test]
+    fn running_policy_gate_scenario_twice_produces_identical_events_and_final_state() {
+        let first = run_policy_gate().expect("first run should succeed");
+        let second = run_policy_gate().expect("second run should succeed");
 
         assert_eq!(first.initial_state, second.initial_state);
         assert_eq!(first.final_state, second.final_state);

@@ -10,39 +10,43 @@ First deterministic scenario added for `mining-bootstrap`. It uses fixed IDs, fi
 
 `worker-failure` added as a deterministic local failure and recovery scenario. It injects a worker failure, records a rejected action while disabled, records repair, resumes work, and verifies replay of the full event stream.
 
+`policy-gate` added as a deterministic validation scenario. It records an oversized mine action as `PolicyRejected`, then records corrected bounded actions through the normal policy-accepted action path and verifies replay of the full event stream.
+
 ## Included in V1
 
 V1 includes:
 
-- Deterministic tick loop.
-- Grid map.
-- Resource node.
-- Storage depot.
-- Miner worker.
-- Hauler worker.
-- Battery level.
-- Structured event log.
-- Replay from event log.
-- Basic task assignment.
-- Initial objective: maintain stockpile.
-- Deterministic mining bootstrap scenario with replay verification.
-- Deterministic worker failure and local recovery scenario with replay verification.
+    - Deterministic tick loop.
+    - Grid map.
+    - Resource node.
+    - Storage depot.
+    - Miner worker.
+    - Hauler worker.
+    - Battery level.
+    - Structured event log.
+    - Replay from event log.
+    - Basic task assignment.
+    - Initial objective: maintain stockpile.
+    - Deterministic mining bootstrap scenario with replay verification.
+    - Deterministic worker failure and local recovery scenario with replay verification.
+    - Deterministic policy-gated action scenario with replay verification.
 
 ## Excluded from V1
 
 V1 excludes:
 
-- LLM planning.
-- Erlang/Elixir runtime.
-- Distributed supervision.
-- Multi-region clustering.
-- Realistic robotics physics.
-- Combat.
-- Graphics-heavy UI.
-- Mars time.
-- Slime mould topology.
-- Advanced routing.
-- Dynamic hierarchy.
+    - LLM planning.
+    - Erlang/Elixir runtime.
+    - Distributed supervision.
+    - Multi-region clustering.
+    - Realistic robotics physics.
+    - Combat.
+    - Graphics-heavy UI.
+    - Mars time.
+    - Slime mould topology.
+    - Advanced routing.
+    - Dynamic hierarchy.
+    - General rule engine or dynamic constraint learning.
 
 ## Initial Scenario Shape
 
@@ -58,12 +62,13 @@ The tick loop should advance in deterministic steps. Worker action outcomes in V
 
 The grid world should provide enough complexity to expose coordination problems without introducing unnecessary domain noise. It should exercise:
 
-- State transition rules.
-- Task assignment.
-- Worker authority.
-- Battery constraints.
-- Failure reporting.
-- Replay.
-- Causal inspection.
+    - State transition rules.
+    - Task assignment.
+    - Worker authority.
+    - Battery constraints.
+    - Policy gates.
+    - Failure reporting.
+    - Replay.
+    - Causal inspection.
 
 Features outside that proving value should be deferred.

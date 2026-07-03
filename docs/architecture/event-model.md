@@ -6,7 +6,7 @@ Events should be deterministic, structured, and sufficient for causal inspection
 
 Now extended the in-memory event layer with the first causal lineage records for objectives, decisions, tasks, assignments, and assigned worker actions. Persistence, scheduling, planning, constraint validation, and full graph validation remain future work. These records are then used in the mining bootstrap scenario to show a complete deterministic event chain from objective acceptance through assigned worker actions and replayed state change. The scenario uses fixed inputs and manual task-assignment construction. 
 
-Added first-class local failure and recovery audit events. `FailureInjected` records deterministic failure injection. `RecoveryEmitted` records explicit recovery before the repair action is applied through the normal action event path.
+Added first-class local failure and recovery audit events. `FailureInjected` records deterministic failure injection. `RecoveryEmitted` records explicit recovery before the repair action is applied through the normal action event path. Now also included is deterministic policy events for direct worker actions. `PolicyAccepted` records that an action passed the current action policy before reducer execution. `PolicyRejected` records that the kernel refused to attempt an action because policy blocked it.
 
 ## Event Properties
 
@@ -50,6 +50,20 @@ In the mining bootstrap scenario, assigned action events carry `AssignmentId(1)`
 
 In the worker-failure scenario, disabling and repairing a worker are recorded as worker actions. An attempted action while the worker is disabled is recorded as `ActionRequested` folowed by `ActionRejected`. 
 
+## Implemented Policy Events
+
+Policy validation is recorded using:
+
+    - `PolicyAccepted`, recorded at the pre-action tick before `ActionRequested`.
+    - `PolicyRejected`, recorded at the unchanged pre-action tick when policy blocks the action.
+
+Policy rejection is distinct from reducer rejection:
+
+    - `PolicyRejected` means the kernel refused to attempt execution.
+    - `ActionRejected` means the reducer was invoked and state rules rejected the action.
+
+`PolicyRejected` does not emit `ActionRequested`, does not mutate world state, and does not advance the world tick.
+
 ## Planned Event Categories
 
 The broader event model should eventually cover:
@@ -81,6 +95,8 @@ Where external systems are involved in later work, their observations should be 
 Replay applies only `ActionApplied` events to world state. Lifecycle events and `ActionRequested` records do not mutate state. `ActionRejected` verifies that the action would still be rejected and also does not mutate state.
 
 Failure and recovery lifecycle events are audit facts. Worker status changes occur only through applied `DisableWorker` and `RepairWorker` actions.
+
+Policy events are also audit facts. Replay verifies their event tick and ordering but does not re-run policy validation yet.
 
 ## Causal Inspection
 

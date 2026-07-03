@@ -30,6 +30,8 @@ The constraint validator checks proposed objectives, tasks, and actions against 
 
 Invalid proposals should be rejected before they reach execution. Rejections should be represented as events with enough context for later inspection.
 
+The first narrow action policy gate implemented for the grid-world worker model. It validates direct worker actions before reducer execution and records policy acceptance or rejection as structured events. This is not yet a general constraint engine.
+
 ## Coordination Kernel
 
 The coordination kernel is the deterministic centre of the system. It accepts validated inputs, emits decisions, creates tasks, applies state deltas, and records events.
@@ -57,8 +59,8 @@ The world or external system is the environment affected by worker action. In V1
 The initial Rust workspace separates shared deterministic primitives from the V1 proving environment:
 
   - `autonomy-core` contains typed identifiers, event identifiers, objective/decision/task/assignment identifiers, ticks, positions, quantities, and deterministic reducer errors.
-  - `autonomy-sim` contains grid-world entities, worker status, direct worker and failure actions, objective/task/assignment data contracts, world state, the pure action reducer, and deterministic scenario construction helpers.
-  - `autonomy-replay` contains the in-memory append-only event log, causal lifecycle recording helpers, failure/recovery recording helpers, assigned action recording flow, deterministic replay, replay verification, and scenario runners.
+  - `autonomy-sim` contains grid-world entities, worker status, direct worker and failure actions, action policy validation, objective/task/assignment data contracts, world state, the pure action reducer, and deterministic scenario construction helpers.
+  - `autonomy-replay` contains the in-memory append-only event log, causal lifecycle recording helpers, policy-aware action recording, failure/recovery recording helpers, assigned action recording flow, deterministic replay, replay verification, and scenario runners.
 
 Future crates for audit and command-line workflows remain scaffolded but unimplemented.
 
@@ -73,3 +75,5 @@ This separation supports replay, auditability, and failure isolation.
 Data contracts for objective, decision, task, and assignment lineage now integrated. It does not implement scheduling or planning. Direct action execution remains available for low-level reducer and replay tests. Now added fixed mining bootstrap scenario that proves end-to-end traceability through the current kernel. It uses explicit IDs, fixed positions, fixed quantities, and a fixed action sequence rather than a scheduler or planner.
 
 Deterministic local worker failure and repair semantics now in place. This is not distributed supervision and does not introduce BEAM/Erlang/Elixir integration yet.
+
+Deterministic action policy gates in place. Policy rejection happens before reducer execution and is distinct from reducer rejection. Scheduling, planning, and automatic replanning remain unimplemented.
