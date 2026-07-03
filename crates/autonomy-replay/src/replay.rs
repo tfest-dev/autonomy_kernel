@@ -122,7 +122,9 @@ pub fn replay_events(
             EventKind::ObjectiveAccepted { .. }
             | EventKind::DecisionEmitted { .. }
             | EventKind::TaskCreated { .. }
-            | EventKind::TaskAssigned { .. } => {
+            | EventKind::TaskAssigned { .. }
+            | EventKind::FailureInjected { .. }
+            | EventKind::RecoveryEmitted { .. } => {
                 validate_event_tick(event.id, state.tick, event.tick)?;
             }
             EventKind::ActionRequested { .. } => {
@@ -222,7 +224,7 @@ mod tests {
     use autonomy_sim::{
         ActionContext, Assignment, CarriedResource, Decision, DecisionKind, Objective,
         ObjectiveKind, ResourceKind, ResourceNode, Storage, Task, TaskKind, Worker, WorkerAction,
-        WorkerRole, WorldState,
+        WorkerRole, WorkerStatus, WorldState,
     };
 
     use crate::{
@@ -273,6 +275,7 @@ mod tests {
                 position: Position::new(0, 0),
                 battery: Quantity::new(4),
                 carried: None,
+                status: WorkerStatus::Active,
             },
         );
         state.workers.insert(
@@ -283,6 +286,7 @@ mod tests {
                 position: Position::new(1, 0),
                 battery: Quantity::new(4),
                 carried: None,
+                status: WorkerStatus::Active,
             },
         );
         state.resource_nodes.insert(

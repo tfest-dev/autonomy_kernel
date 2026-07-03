@@ -8,6 +8,8 @@ First deterministic Rust world-state skeleton introduced for the environment wit
 
 First deterministic scenario added for `mining-bootstrap`. It uses fixed IDs, fixed positions, fixed quantities, and a fixed worker action sequence to prove end-to-end traceability through objective, decision, task, assignment, action events, state transition, and replay.
 
+`worker-failure` added as a deterministic local failure and recovery scenario. It injects a worker failure, records a rejected action while disabled, records repair, resumes work, and verifies replay of the full event stream.
+
 ## Included in V1
 
 V1 includes:
@@ -24,6 +26,7 @@ V1 includes:
 - Basic task assignment.
 - Initial objective: maintain stockpile.
 - Deterministic mining bootstrap scenario with replay verification.
+- Deterministic worker failure and local recovery scenario with replay verification.
 
 ## Excluded from V1
 
@@ -31,6 +34,7 @@ V1 excludes:
 
 - LLM planning.
 - Erlang/Elixir runtime.
+- Distributed supervision.
 - Multi-region clustering.
 - Realistic robotics physics.
 - Combat.

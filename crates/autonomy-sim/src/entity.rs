@@ -13,6 +13,12 @@ pub enum WorkerRole {
     Hauler,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WorkerStatus {
+    Active,
+    Disabled,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CarriedResource {
     pub kind: ResourceKind,
@@ -26,6 +32,7 @@ pub struct Worker {
     pub position: Position,
     pub battery: Quantity,
     pub carried: Option<CarriedResource>,
+    pub status: WorkerStatus,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

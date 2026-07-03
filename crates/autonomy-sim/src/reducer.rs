@@ -2,7 +2,7 @@ use autonomy_core::{Quantity, SimError, WorkerId};
 
 use crate::{
     action::WorkerAction,
-    entity::{CarriedResource, Worker, WorkerRole},
+    entity::{CarriedResource, Worker, WorkerRole, WorkerStatus},
     world::WorldState,
 };
 
@@ -22,6 +22,8 @@ pub fn apply_action(state: &WorldState, action: &WorkerAction) -> Result<WorldSt
         } => apply_deposit(state, *worker_id, *storage_id),
         WorkerAction::Recharge { worker_id, amount } => apply_recharge(state, *worker_id, *amount),
         WorkerAction::Wait { worker_id } => apply_wait(state, *worker_id),
+        WorkerAction::DisableWorker { worker_id } => apply_disable_worker(state, *worker_id),
+        WorkerAction::RepairWorker { worker_id } => apply_repair_worker(state, *worker_id),
     }
 }
 
@@ -31,6 +33,7 @@ fn apply_move(
     to: autonomy_core::Position,
 ) -> Result<WorldState, SimError> {
     let worker = worker(state, worker_id)?;
+    ensure_active(worker)?;
     let battery = battery_after_cost(worker, ACTION_BATTERY_COST)?;
 
     if !worker.position.is_adjacent(to) {
@@ -64,6 +67,7 @@ fn apply_mine(
     }
 
     let worker = worker(state, worker_id)?;
+    ensure_active(worker)?;
     let node = state
         .resource_nodes
         .get(&node_id)
@@ -123,6 +127,7 @@ fn apply_deposit(
     storage_id: autonomy_core::StorageId,
 ) -> Result<WorldState, SimError> {
     let worker = worker(state, worker_id)?;
+    ensure_active(worker)?;
     let storage = state
         .storage
         .get(&storage_id)
@@ -177,6 +182,7 @@ fn apply_recharge(
     amount: Quantity,
 ) -> Result<WorldState, SimError> {
     let worker = worker(state, worker_id)?;
+    ensure_active(worker)?;
     let battery = worker
         .battery
         .checked_add(amount)
@@ -196,9 +202,42 @@ fn apply_recharge(
 }
 
 fn apply_wait(state: &WorldState, worker_id: WorkerId) -> Result<WorldState, SimError> {
-    worker(state, worker_id)?;
+    let worker = worker(state, worker_id)?;
+    ensure_active(worker)?;
 
     let mut next = state.clone();
+    advance_tick(&mut next)?;
+    Ok(next)
+}
+
+fn apply_disable_worker(state: &WorldState, worker_id: WorkerId) -> Result<WorldState, SimError> {
+    let worker = worker(state, worker_id)?;
+    if worker.status == WorkerStatus::Disabled {
+        return Err(SimError::InvalidAction("worker is already disabled"));
+    }
+
+    let mut next = state.clone();
+    let worker = next
+        .workers
+        .get_mut(&worker_id)
+        .expect("worker was validated before state clone");
+    worker.status = WorkerStatus::Disabled;
+    advance_tick(&mut next)?;
+    Ok(next)
+}
+
+fn apply_repair_worker(state: &WorldState, worker_id: WorkerId) -> Result<WorldState, SimError> {
+    let worker = worker(state, worker_id)?;
+    if worker.status == WorkerStatus::Active {
+        return Err(SimError::InvalidAction("worker is already active"));
+    }
+
+    let mut next = state.clone();
+    let worker = next
+        .workers
+        .get_mut(&worker_id)
+        .expect("worker was validated before state clone");
+    worker.status = WorkerStatus::Active;
     advance_tick(&mut next)?;
     Ok(next)
 }
@@ -208,6 +247,14 @@ fn worker(state: &WorldState, worker_id: WorkerId) -> Result<&Worker, SimError> 
         .workers
         .get(&worker_id)
         .ok_or(SimError::UnknownWorker(worker_id))
+}
+
+fn ensure_active(worker: &Worker) -> Result<(), SimError> {
+    if worker.status == WorkerStatus::Disabled {
+        return Err(SimError::WorkerDisabled(worker.id));
+    }
+
+    Ok(())
 }
 
 fn battery_after_cost(worker: &Worker, cost: Quantity) -> Result<Quantity, SimError> {
@@ -234,7 +281,9 @@ mod tests {
 
     use crate::{
         action::WorkerAction,
-        entity::{CarriedResource, ResourceKind, ResourceNode, Storage, Worker, WorkerRole},
+        entity::{
+            CarriedResource, ResourceKind, ResourceNode, Storage, Worker, WorkerRole, WorkerStatus,
+        },
         reducer::apply_action,
         world::WorldState,
     };
@@ -261,6 +310,7 @@ mod tests {
                 position: Position::new(0, 0),
                 battery: Quantity::new(3),
                 carried: None,
+                status: WorkerStatus::Active,
             },
         );
         state.workers.insert(
@@ -271,6 +321,7 @@ mod tests {
                 position: Position::new(1, 0),
                 battery: Quantity::new(3),
                 carried: None,
+                status: WorkerStatus::Active,
             },
         );
         state.resource_nodes.insert(
@@ -581,6 +632,7 @@ mod tests {
                 position: Position::new(0, 0),
                 battery: Quantity::ONE,
                 carried: None,
+                status: WorkerStatus::Active,
             },
         );
         state.workers.insert(
@@ -591,12 +643,248 @@ mod tests {
                 position: Position::new(0, 0),
                 battery: Quantity::ONE,
                 carried: None,
+                status: WorkerStatus::Active,
             },
         );
 
         assert_eq!(
             state.workers.keys().copied().collect::<Vec<_>>(),
             vec![worker_id(2), worker_id(10)]
+        );
+    }
+
+    #[test]
+    fn new_workers_are_constructed_as_active() {
+        let state = base_world();
+
+        assert_eq!(
+            state
+                .workers
+                .get(&worker_id(1))
+                .expect("worker exists")
+                .status,
+            WorkerStatus::Active
+        );
+    }
+
+    #[test]
+    fn disabled_worker_cannot_move() {
+        let mut state = base_world();
+        state.workers.get_mut(&worker_id(1)).unwrap().status = WorkerStatus::Disabled;
+
+        let result = apply_action(
+            &state,
+            &WorkerAction::Move {
+                worker_id: worker_id(1),
+                to: Position::new(1, 0),
+            },
+        );
+
+        assert_eq!(result, Err(SimError::WorkerDisabled(worker_id(1))));
+    }
+
+    #[test]
+    fn disabled_worker_cannot_mine() {
+        let mut state = base_world();
+        state.workers.get_mut(&worker_id(1)).unwrap().status = WorkerStatus::Disabled;
+
+        let result = apply_action(
+            &state,
+            &WorkerAction::Mine {
+                worker_id: worker_id(1),
+                node_id: node_id(1),
+                quantity: Quantity::new(1),
+            },
+        );
+
+        assert_eq!(result, Err(SimError::WorkerDisabled(worker_id(1))));
+    }
+
+    #[test]
+    fn disabled_worker_cannot_deposit() {
+        let mut state = base_world();
+        let worker = state.workers.get_mut(&worker_id(1)).unwrap();
+        worker.position = Position::new(1, 1);
+        worker.status = WorkerStatus::Disabled;
+        worker.carried = Some(CarriedResource {
+            kind: ResourceKind::Iron,
+            quantity: Quantity::new(1),
+        });
+
+        let result = apply_action(
+            &state,
+            &WorkerAction::Deposit {
+                worker_id: worker_id(1),
+                storage_id: storage_id(1),
+            },
+        );
+
+        assert_eq!(result, Err(SimError::WorkerDisabled(worker_id(1))));
+    }
+
+    #[test]
+    fn failed_disabled_worker_action_leaves_state_unchanged() {
+        let mut state = base_world();
+        state.workers.get_mut(&worker_id(1)).unwrap().status = WorkerStatus::Disabled;
+        let original = state.clone();
+
+        let result = apply_action(
+            &state,
+            &WorkerAction::Wait {
+                worker_id: worker_id(1),
+            },
+        );
+
+        assert_eq!(result, Err(SimError::WorkerDisabled(worker_id(1))));
+        assert_eq!(state, original);
+    }
+
+    #[test]
+    fn failed_disabled_worker_action_does_not_advance_tick() {
+        let mut state = base_world();
+        state.workers.get_mut(&worker_id(1)).unwrap().status = WorkerStatus::Disabled;
+
+        let result = apply_action(
+            &state,
+            &WorkerAction::Recharge {
+                worker_id: worker_id(1),
+                amount: Quantity::new(1),
+            },
+        );
+
+        assert_eq!(result, Err(SimError::WorkerDisabled(worker_id(1))));
+        assert_eq!(state.tick, Tick::ZERO);
+    }
+
+    #[test]
+    fn disable_worker_disables_active_worker_and_advances_tick() {
+        let state = base_world();
+
+        let next = apply_action(
+            &state,
+            &WorkerAction::DisableWorker {
+                worker_id: worker_id(1),
+            },
+        )
+        .expect("disable should succeed");
+
+        assert_eq!(
+            next.workers
+                .get(&worker_id(1))
+                .expect("worker exists")
+                .status,
+            WorkerStatus::Disabled
+        );
+        assert_eq!(next.tick, Tick::new(1));
+    }
+
+    #[test]
+    fn disable_worker_rejects_already_disabled_worker() {
+        let mut state = base_world();
+        state.workers.get_mut(&worker_id(1)).unwrap().status = WorkerStatus::Disabled;
+        let original = state.clone();
+
+        let result = apply_action(
+            &state,
+            &WorkerAction::DisableWorker {
+                worker_id: worker_id(1),
+            },
+        );
+
+        assert!(matches!(result, Err(SimError::InvalidAction(_))));
+        assert_eq!(state, original);
+    }
+
+    #[test]
+    fn repair_worker_reactivates_disabled_worker_and_advances_tick() {
+        let mut state = base_world();
+        state.workers.get_mut(&worker_id(1)).unwrap().status = WorkerStatus::Disabled;
+
+        let next = apply_action(
+            &state,
+            &WorkerAction::RepairWorker {
+                worker_id: worker_id(1),
+            },
+        )
+        .expect("repair should succeed");
+
+        assert_eq!(
+            next.workers
+                .get(&worker_id(1))
+                .expect("worker exists")
+                .status,
+            WorkerStatus::Active
+        );
+        assert_eq!(next.tick, Tick::new(1));
+    }
+
+    #[test]
+    fn repair_worker_rejects_already_active_worker() {
+        let state = base_world();
+        let original = state.clone();
+
+        let result = apply_action(
+            &state,
+            &WorkerAction::RepairWorker {
+                worker_id: worker_id(1),
+            },
+        );
+
+        assert!(matches!(result, Err(SimError::InvalidAction(_))));
+        assert_eq!(state, original);
+    }
+
+    #[test]
+    fn repair_preserves_worker_position() {
+        let mut state = base_world();
+        let worker = state.workers.get_mut(&worker_id(1)).unwrap();
+        worker.status = WorkerStatus::Disabled;
+        worker.position = Position::new(1, 0);
+
+        let next = apply_action(
+            &state,
+            &WorkerAction::RepairWorker {
+                worker_id: worker_id(1),
+            },
+        )
+        .expect("repair should succeed");
+
+        assert_eq!(
+            next.workers
+                .get(&worker_id(1))
+                .expect("worker exists")
+                .position,
+            Position::new(1, 0)
+        );
+    }
+
+    #[test]
+    fn repair_preserves_worker_carried_resource() {
+        let mut state = base_world();
+        let worker = state.workers.get_mut(&worker_id(1)).unwrap();
+        worker.status = WorkerStatus::Disabled;
+        worker.carried = Some(CarriedResource {
+            kind: ResourceKind::Iron,
+            quantity: Quantity::new(2),
+        });
+
+        let next = apply_action(
+            &state,
+            &WorkerAction::RepairWorker {
+                worker_id: worker_id(1),
+            },
+        )
+        .expect("repair should succeed");
+
+        assert_eq!(
+            next.workers
+                .get(&worker_id(1))
+                .expect("worker exists")
+                .carried,
+            Some(CarriedResource {
+                kind: ResourceKind::Iron,
+                quantity: Quantity::new(2),
+            })
         );
     }
 }

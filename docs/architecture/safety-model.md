@@ -20,7 +20,7 @@ Workers execute assigned tasks within bounded authority. They cannot redefine ob
 
 Worker outputs are reports or action results. The kernel decides whether state deltas are accepted.
 
-The current implementation can record assignment context on worker action events. That context is causal evidence, not an implemented scheduler or permission system.
+The current implementation can record assignment context on worker action events. That context is causal evidence, not an implemented scheduler or permission system. It also models local worker disablement and repair. Disabled workers cannot perform normal worker actions. Failure injection and recovery are explicit events and replay-compatible, but this is not a distributed supervision system. 
 
 ## Layered Authority
 
@@ -40,6 +40,8 @@ No layer should silently assume the authority of another.
 Failures should be represented explicitly and isolated to the smallest practical scope. A worker failure, invalid action, depleted battery, or unreachable resource should become a structured event that can be supervised and replayed.
 
 The system should avoid hidden partial success where possible. If partial progress affects state, it should be recorded.
+
+Failure recovery path records injected worker failure as a first-class audit event and applies disablement through the reducer. Recovery is recorded explicitly before a repair action is applied.
 
 ## Audit and Diagnosis
 

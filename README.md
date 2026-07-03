@@ -4,7 +4,7 @@ Autonomy Kernel is a deterministic control substrate for AI-operated distributed
 
 It allows high-level intent to be decomposed into bounded, traceable, semi-autonomous execution while preserving repeatability, auditability, failure isolation, and constraint enforcement.
 
-Status: initial Rust workspace with deterministic world-state, in-memory action event log, replay skeleton, causal objective/task lineage, and a fixed mining bootstrap scenario. Scheduling, planning, persistence, and integration have not started
+Status: initial Rust workspace with deterministic world-state, in-memory action event log, replay skeleton, causal objective/task lineage, fixed mining bootstrap scenario, and a deterministic local failure/recovery scenario. Scheduling, planning, persistence, and integration have not started
 
 ## Project Purpose
 
@@ -79,13 +79,13 @@ The first scenario is `mining-bootstrap`, a fixed deterministic flow that record
 
 ## Repository Status
 
-This repository currently contains the initial public documentation, Rust workspace, deterministic core primitives, minimal grid-world state/reducer types, the first in-memory event sourcing and replay layer for direct worker actions, causal event records for objectives, decisions, tasks, assignments, and assigned worker actions, and the first deterministic mining bootstrap scenario. Schedulers, planners, persistence, distributed runtimes, and integrations have not started. 
+This repository currently contains the initial public documentation, Rust workspace, deterministic core primitives, minimal grid-world state/reducer types, the first in-memory event sourcing and replay layer, causal event records for objectives, decisions, tasks, assignments, assigned worker actions, deterministic mining bootstrap scenario, and deterministic worker failure/recovery scenario. Schedulers, planners, persistence, distributed runtimes, and integrations have not started.
 
 ## Roadmap Summary
 
 1. Add explicit constraint validation around objective, task, assignment, and action records. 
 2. Add deterministic task assignment for miner and hauler workers. 
-3. Expand scenario coverage for worker failure and battery constraints.
+3. Expand scenario coverage for battery constraints and recovery edge cases.
 4. Add persisted event logs and replay inputs when the in-memory model stabilises.
 5. Add audit views for causal inspection and failure diagnosis.
-6. Add planner integration only after kernel-side authority boundaries are explicit. 
+6. Add planner or distributed runtime integration only after kernel-side authority boundaries are explicit. 

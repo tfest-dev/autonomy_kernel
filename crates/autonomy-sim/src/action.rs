@@ -22,4 +22,10 @@ pub enum WorkerAction {
     Wait {
         worker_id: WorkerId,
     },
+    DisableWorker {
+        worker_id: WorkerId,
+    },
+    RepairWorker {
+        worker_id: WorkerId,
+    },
 }

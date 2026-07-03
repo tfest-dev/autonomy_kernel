@@ -6,6 +6,8 @@ Replay consumes an initial `WorldState` and an in-memory sequence of event envel
 
 Added a deterministic mining bootstrap scenario that verifies replay of a full objective-to-action event stream. The verification remains in-memory and uses fixed scenario inputs.
 
+Deterministic failure recovery path implemented with added replay coverage for local failure and recovery. The replay path reconstructs worker disablement, rejected disabled-worker action, explicit repair, resumed work, and final objective satisfaction from the event stream. 
+
 ## Replay Goal
 
 The primary replay goal is:
@@ -48,6 +50,13 @@ The mining bootstrap scenario verifies:
     - Lifecycle events do not mutate world state.
     - Assigned action events preserve assignment context.
     - Replayed state matches the scenario final state exactly.
+
+The worker-failure scenario additionally verifies:
+
+    - Failure and recovery lifecycle events do not mutate state directly.
+    - Disabled-worker actions are rejected deterministically.
+    - Repair is explicit and replayable.
+    - Replayed state matches the recovered final state exactly.
 
 ## State Hashing
 

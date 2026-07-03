@@ -57,8 +57,8 @@ The world or external system is the environment affected by worker action. In V1
 The initial Rust workspace separates shared deterministic primitives from the V1 proving environment:
 
   - `autonomy-core` contains typed identifiers, event identifiers, objective/decision/task/assignment identifiers, ticks, positions, quantities, and deterministic reducer errors.
-  - `autonomy-sim` contains grid-world entities, direct worker actions, objective/task/assignment data contracts, world state, the pure action reducer, and deterministic scenario construction helpers.
-  - `autonomy-replay` contains the in-memory append-only event log, causal lifecycle recording helpers, assigned action recording flow, deterministic replay, replay verification, and the mining bootstrap scenario runner.
+  - `autonomy-sim` contains grid-world entities, worker status, direct worker and failure actions, objective/task/assignment data contracts, world state, the pure action reducer, and deterministic scenario construction helpers.
+  - `autonomy-replay` contains the in-memory append-only event log, causal lifecycle recording helpers, failure/recovery recording helpers, assigned action recording flow, deterministic replay, replay verification, and scenario runners.
 
 Future crates for audit and command-line workflows remain scaffolded but unimplemented.
 
@@ -71,3 +71,5 @@ Reasoning is separated from execution by design. LLMs or other planners may prop
 This separation supports replay, auditability, and failure isolation.
 
 Data contracts for objective, decision, task, and assignment lineage now integrated. It does not implement scheduling or planning. Direct action execution remains available for low-level reducer and replay tests. Now added fixed mining bootstrap scenario that proves end-to-end traceability through the current kernel. It uses explicit IDs, fixed positions, fixed quantities, and a fixed action sequence rather than a scheduler or planner.
+
+Deterministic local worker failure and repair semantics now in place. This is not distributed supervision and does not introduce BEAM/Erlang/Elixir integration yet.

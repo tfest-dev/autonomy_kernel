@@ -1,6 +1,7 @@
 pub mod action;
 pub mod assignment;
 pub mod entity;
+pub mod failure;
 pub mod objective;
 pub mod reducer;
 pub mod scenario;
@@ -9,7 +10,10 @@ pub mod world;
 
 pub use action::WorkerAction;
 pub use assignment::{ActionContext, Assignment, CausalParent};
-pub use entity::{CarriedResource, ResourceKind, ResourceNode, Storage, Worker, WorkerRole};
+pub use entity::{
+    CarriedResource, ResourceKind, ResourceNode, Storage, Worker, WorkerRole, WorkerStatus,
+};
+pub use failure::{FailureReason, RecoveryKind};
 pub use objective::{Objective, ObjectiveKind};
 pub use reducer::apply_action;
 pub use scenario::{

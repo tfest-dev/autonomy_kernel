@@ -8,6 +8,7 @@ pub enum SimError {
     UnknownWorker(WorkerId),
     UnknownResourceNode(ResourceNodeId),
     UnknownStorage(StorageId),
+    WorkerDisabled(WorkerId),
     InvalidAction(&'static str),
     InsufficientBattery {
         worker_id: WorkerId,
@@ -36,6 +37,7 @@ impl fmt::Display for SimError {
             Self::UnknownWorker(id) => write!(f, "unknown worker: {}", id.value()),
             Self::UnknownResourceNode(id) => write!(f, "unknown resource node: {}", id.value()),
             Self::UnknownStorage(id) => write!(f, "unknown storage: {}", id.value()),
+            Self::WorkerDisabled(id) => write!(f, "worker is disabled: {}", id.value()),
             Self::InvalidAction(reason) => write!(f, "invalid action: {reason}"),
             Self::InsufficientBattery {
                 worker_id,

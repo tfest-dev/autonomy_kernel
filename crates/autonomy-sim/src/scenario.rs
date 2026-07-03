@@ -1,13 +1,13 @@
 use std::collections::BTreeMap;
 
 use autonomy_core::{
-    AssignmentId, DecisionId, ObjectiveId, Position, Quantity, ResourceNodeId, StorageId, TaskID,
+    AssignmentId, DecisionId, ObjectiveId, Position, Quantity, ResourceNodeId, StorageId, TaskId,
     Tick, WorkerId,
 };
 
 use crate::{
     Assignment, Decision, DecisionKind, Objective, ObjectiveKind, ResourceKind, ResourceNode,
-    Storage, Task, TaskKind, Worker, WorkerAction, WorkerRole, WorldState,
+    Storage, Task, TaskKind, Worker, WorkerAction, WorkerRole, WorkerStatus, WorldState,
 };
 
 pub const MINING_BOOTSTRAP_OBJECTIVE_ID: ObjectiveId = ObjectiveId(1);
@@ -34,6 +34,7 @@ pub fn build_mining_bootstrap_world() -> WorldState {
             position: Position::new(0, 0),
             battery: MINING_BOOTSTRAP_WORKER_BATTERY,
             carried: None,
+            status: WorkerStatus::Active,
         },
     );
     state.resource_nodes.insert(

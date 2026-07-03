@@ -1,6 +1,7 @@
-use autonomy_core::{AssignmentId, EventId, SimError, Tick};
+use autonomy_core::{AssignmentId, EventId, SimError, Tick, WorkerId};
 use autonomy_sim::{
-    apply_action, ActionContext, Assignment, Decision, Objective, Task, WorkerAction, WorldState,
+    apply_action, ActionContext, Assignment, Decision, FailureReason, Objective, RecoveryKind,
+    Task, WorkerAction, WorldState,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -23,6 +24,14 @@ pub enum EventKind {
     },
     TaskAssigned {
         assignment: Assignment,
+    },
+    FailureInjected {
+        worker_id: WorkerId,
+        reason: FailureReason,
+    },
+    RecoveryEmitted {
+        worker_id: WorkerId,
+        recovery: RecoveryKind,
     },
     ActionRequested {
         action: WorkerAction,
@@ -49,7 +58,9 @@ impl EventKind {
             | Self::ActionRejected { context, .. } => context.assignment_id,
             Self::ObjectiveAccepted { .. }
             | Self::DecisionEmitted { .. }
-            | Self::TaskCreated { .. } => None,
+            | Self::TaskCreated { .. }
+            | Self::FailureInjected { .. }
+            | Self::RecoveryEmitted { .. } => None,
         }
     }
 }
@@ -178,6 +189,48 @@ pub fn record_task_assigned(
     assignment: Assignment,
 ) -> EventEnvelope {
     log.append(tick, EventKind::TaskAssigned { assignment })
+}
+
+pub fn record_worker_failure(
+    state: &WorldState,
+    log: &mut EventLog,
+    worker_id: WorkerId,
+    assignment_id: Option<AssignmentId>,
+) -> Result<WorldState, SimError> {
+    log.append(
+        state.tick,
+        EventKind::FailureInjected {
+            worker_id,
+            reason: FailureReason::Injected,
+        },
+    );
+    record_action_with_context(
+        state,
+        log,
+        WorkerAction::DisableWorker { worker_id },
+        assignment_id,
+    )
+}
+
+pub fn record_worker_recovery(
+    state: &WorldState,
+    log: &mut EventLog,
+    worker_id: WorkerId,
+    assignment_id: Option<AssignmentId>,
+) -> Result<WorldState, SimError> {
+    log.append(
+        state.tick,
+        EventKind::RecoveryEmitted {
+            worker_id,
+            recovery: RecoveryKind::RepairWorker,
+        },
+    );
+    record_action_with_context(
+        state,
+        log,
+        WorkerAction::RepairWorker { worker_id },
+        assignment_id,
+    )
 }
 
 pub fn assignment_for_action_event(event: &EventEnvelope) -> Option<AssignmentId> {

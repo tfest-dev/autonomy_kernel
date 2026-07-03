@@ -6,6 +6,8 @@ Events should be deterministic, structured, and sufficient for causal inspection
 
 Now extended the in-memory event layer with the first causal lineage records for objectives, decisions, tasks, assignments, and assigned worker actions. Persistence, scheduling, planning, constraint validation, and full graph validation remain future work. These records are then used in the mining bootstrap scenario to show a complete deterministic event chain from objective acceptance through assigned worker actions and replayed state change. The scenario uses fixed inputs and manual task-assignment construction. 
 
+Added first-class local failure and recovery audit events. `FailureInjected` records deterministic failure injection. `RecoveryEmitted` records explicit recovery before the repair action is applied through the normal action event path.
+
 ## Event Properties
 
 Planned event properties include:
@@ -46,6 +48,8 @@ Rejected actions are still events. They are part of the audit history because a 
 
 In the mining bootstrap scenario, assigned action events carry `AssignmentId(1)` so the recorded worker actions can be traced back to the task assignment.
 
+In the worker-failure scenario, disabling and repairing a worker are recorded as worker actions. An attempted action while the worker is disabled is recorded as `ActionRequested` folowed by `ActionRejected`. 
+
 ## Planned Event Categories
 
 The broader event model should eventually cover:
@@ -75,6 +79,8 @@ Given the same initial state and the same accepted event sequence, the kernel sh
 Where external systems are involved in later work, their observations should be captured as explicit events before they influence kernel state.
 
 Replay applies only `ActionApplied` events to world state. Lifecycle events and `ActionRequested` records do not mutate state. `ActionRejected` verifies that the action would still be rejected and also does not mutate state.
+
+Failure and recovery lifecycle events are audit facts. Worker status changes occur only through applied `DisableWorker` and `RepairWorker` actions.
 
 ## Causal Inspection
 
