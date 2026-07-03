@@ -56,8 +56,11 @@ The world or external system is the environment affected by worker action. In V1
 
 The initial Rust workspace separates shared deterministic primitives from the V1 proving environment:
 
-  - `autonomy-core` contains typed identifiers, ticks, positions, quantities, and deterministic reducer errors.
-  - `autonomy-sim` contains grid-world entities, direct worker actions, world state, and the pure action reducer. 
+  - `autonomy-core` contains typed identifiers, event identifiers, ticks, positions, quantities, and deterministic reducer errors.
+  - `autonomy-sim` contains grid-world entities, direct worker actions, world state, and the pure action reducer.
+  - `autonomy-replay` contains the first in-memory append-only event log, direct action recording flow, deterministic replay, and replay verification.
+
+Future crates for audit and command-line workflows remain scaffolded but unimplemented.
 
 Future crates for replay, audit, and command-line workflows remain scaffolded but unimplemented. 
 

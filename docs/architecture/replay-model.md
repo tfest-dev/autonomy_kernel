@@ -2,6 +2,8 @@
 
 Replay is a core safety primitive for Autonomy Kernel, not just a logging feature. The system is planned so that execution can be reconstructed from an initial state and an event sequence.
 
+First deterministic replay mechanism in place for direct worker actions. It consumes an initial `WorldState` and an in-memory sequence of event envelopes. It does not yet include persistence, objective/task replay, causal graph export, or distributed runtime suport.
+
 ## Replay Goal
 
 The primary replay goal is:
@@ -28,6 +30,14 @@ Replay is expected to support:
 Replay should consume the accepted event log and initial state. Runtime-only state, transient process memory, or unrecorded external observations should not be required to reconstruct the result.
 
 This requirement influences event design: any observation or decision that can affect state must be recorded explicitly.
+
+For the current direct-action model, replay treats events as reconstruction data:
+
+    - `ActionRequested` verifies the pre-action tick and does not mutate state.
+    - `ActionApplied` reapplies the contained action through the reducer and checks the resulting tick.
+    - `ActionRejected` verifies that the contained action still fails and leaves state unchanged.
+
+Malformed or inconsistent event sequences are rejected rather than skipped. Examples include duplicate event IDs, non-monotonic event IDs, tick mismatches, applied actions that fail during replay, rejected actions that now succeed, and resulting tick mismatches.
 
 ## State Hashing
 

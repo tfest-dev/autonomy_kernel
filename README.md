@@ -4,7 +4,7 @@ Autonomy Kernel is a deterministic control substrate for AI-operated distributed
 
 It allows high-level intent to be decomposed into bounded, traceable, semi-autonomous execution while preserving repeatability, auditability, failure isolation, and constraint enforcement.
 
-Status: initial Rust workspace and deterministic world-state skeleton. Event sourcing, replay, scheduling, and integrations have not started.
+Status: initial Rust workspace with deterministic world-state, in-memory action event log, and replay skeleton. Scheduling, planning, persistence, and integration have not started
 
 ## Project Purpose
 
@@ -77,13 +77,13 @@ The initial objective is to maintain a resource stockpile using a small set of w
 
 ## Repository Status
 
-This repository currently contains the initial public documentation, Rust workspace, deterministic core primitives, and minimal grid-world state/reducer types. Full event sourcing, replay tooling, schedulers, planners, and integrations have not started.
+This repository currently contains the initial public documentation, Rust workspace, deterministic core primitives, minimal grid-world state/reducer types, and the first in-memory event sourcing and replay layer for direct worker actions. Schedulers, planners, persistence, distributed runtimes, and integrations have not started. 
 
 ## Roadmap Summary
 
-1. Refine core state and action types as event sourcing requirements become concrete.
-2. Add structured event logging for accepted state transitions.
-3. Add replay from recorded events and initial state.
-4. Add basic task assignment for miner and hauler workers.
-5. Add constraint checks beyond the initial reducer rules.
-6. Add audit views for causal inspection and failure diagnosis.
+1. Refine event records as objective, task, and decision models become concrete.
+2. Add task assignment for miner and hauler workers. 
+3. Add constraint checks beyond the initial reducer rules.
+4. Add persisted event logs and replay inputs when the in-memory model stabilises.
+5. Add audit views for causal inspection and failure diagnosis.
+6. Add planner integration only after kernel-side authority boundaries are explicit. 

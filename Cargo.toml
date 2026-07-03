@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/autonomy-core",
+    "crates/autonomy-replay",
     "crates/autonomy-sim",
 ]
 resolver = "2"

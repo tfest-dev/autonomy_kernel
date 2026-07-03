@@ -4,37 +4,48 @@ Autonomy Kernel is planned around an append-only event model. Events describe ac
 
 Events should be deterministic, structured, and sufficient for causal inspection.
 
+Currently implemented is the first event layer for direct worker actions. It is intentionally in-memory and limited to the existing reducer. Objective, task, decision, persistence, and causal parent models remain future work. 
+
 ## Event Properties
 
 Planned event properties include:
 
-- Stable event identifier.
-- Run identifier.
-- Sequence number or deterministic ordering key.
-- Event category.
-- Timestamp or logical tick.
-- Causal parent references where applicable.
-- Actor or layer responsible for emission.
-- Structured payload.
-- State hash or transition hash where applicable in later work.
+    - Stable event identifier.
+    - Deterministic ordering key.
+    - Event category.
+    - Logical tick.
+    - Structured payload.
+    - Causal parent references where applicable in later work.
+    - Actor or layer responsible for emission in later work.
+    - State hash or transition hash where applicable in later work.
 
-The exact schema is intentionally deferred until implementation starts.
+The first implemented envelope contains an `EventId`, a `Tick`, and an event kind. Event IDs start at `EventId(1)` in an `EventLog` and increase deterministically as events are appended.
+
+## Implemented Action Events
+
+Now records direct worker action execution using:
+
+    - `ActionRequested`, recorded at the pre-action tick.
+    - `ActionApplied`, recorded at the post-action tick after the reducer succeeds.
+    - `ActionRejected`, recorded at the unchanged pre-action tick after the reducer rejects the action.
+
+Rejected actions are still events. They are part of the audit history because a failed attempt can explain why state did not change.
 
 ## Planned Event Categories
 
-The initial event model should cover:
+The broader event model should eventually cover:
 
-- Objective accepted.
-- Proposal validated or rejected.
-- Decision emitted.
-- Task created.
-- Task assigned.
-- Worker action requested.
-- Worker action completed.
-- State delta applied.
-- Constraint violation.
-- Failure detected.
-- Recovery action emitted.
+    - Objective accepted.
+    - Proposal validated or rejected.
+    - Decision emitted.
+    - Task created.
+    - Task assigned.
+    - Worker action requested.
+    - Worker action completed.
+    - State delta applied.
+    - Constraint violation.
+    - Failure detected.
+    - Recovery action emitted.
 
 ## Append-Only History
 
