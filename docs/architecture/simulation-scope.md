@@ -6,6 +6,8 @@ The simulation is intentionally limited. It is not the product and should not de
 
 First deterministic Rust world-state skeleton introduced for the environment with: typed identifiers, ticks, positions, quantities, workers, resource nodes, storage, direct worker actions, and a pure reducer. It does not yet implement event sourcing, replay logs, schedulers, or planners. 
 
+First deterministic scenario added for `mining-bootstrap`. It uses fixed IDs, fixed positions, fixed quantities, and a fixed worker action sequence to prove end-to-end traceability through objective, decision, task, assignment, action events, state transition, and replay.
+
 ## Included in V1
 
 V1 includes:
@@ -21,6 +23,7 @@ V1 includes:
 - Replay from event log.
 - Basic task assignment.
 - Initial objective: maintain stockpile.
+- Deterministic mining bootstrap scenario with replay verification.
 
 ## Excluded from V1
 

@@ -4,7 +4,7 @@ Autonomy Kernel is planned around an append-only event model. Events describe ac
 
 Events should be deterministic, structured, and sufficient for causal inspection.
 
-Now extended the in-memory event layer with the first causal lineage records for objectives, decisions, tasks, assignments, and assigned worker actions. Persistence, scheduling, planning, constraint validation, and full graph validation remain future work. 
+Now extended the in-memory event layer with the first causal lineage records for objectives, decisions, tasks, assignments, and assigned worker actions. Persistence, scheduling, planning, constraint validation, and full graph validation remain future work. These records are then used in the mining bootstrap scenario to show a complete deterministic event chain from objective acceptance through assigned worker actions and replayed state change. The scenario uses fixed inputs and manual task-assignment construction. 
 
 ## Event Properties
 
@@ -43,6 +43,8 @@ Worker action execution is recorded using:
 Action events may carry an optional assignment reference. Direct actions without assignment context remain valid for low-level reducer and replay testing.
 
 Rejected actions are still events. They are part of the audit history because a failed attempt can explain why state did not change.
+
+In the mining bootstrap scenario, assigned action events carry `AssignmentId(1)` so the recorded worker actions can be traced back to the task assignment.
 
 ## Planned Event Categories
 

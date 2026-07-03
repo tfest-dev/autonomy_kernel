@@ -1,5 +1,6 @@
 pub mod event_log;
 pub mod replay;
+pub mod scenario;
 pub mod verification;
 
 pub use event_log::{
@@ -8,4 +9,8 @@ pub use event_log::{
     EventEnvelope, EventKind, EventLog,
 };
 pub use replay::{replay_events, ReplayError};
+pub use scenario::{
+    mining_bootstrap_stockpile_quantity, run_mining_bootstrap,
+    validate_mining_bootstrap_final_state, ScenarioError, ScenarioRun,
+};
 pub use verification::verify_replay;
