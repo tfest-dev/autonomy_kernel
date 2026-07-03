@@ -4,7 +4,7 @@ Autonomy Kernel is a deterministic control substrate for AI-operated distributed
 
 It allows high-level intent to be decomposed into bounded, traceable, semi-autonomous execution while preserving repeatability, auditability, failure isolation, and constraint enforcement.
 
-Status: initial Rust workspace with deterministic world-state, in-memory action event log, and replay skeleton. Scheduling, planning, persistence, and integration have not started
+Status: initial Rust workspace with deterministic world-state, in-memory action event log, replay skeleton, and causal objective/task lineage. Scheduling, planning, persistence, and integration have not started
 
 ## Project Purpose
 
@@ -77,13 +77,13 @@ The initial objective is to maintain a resource stockpile using a small set of w
 
 ## Repository Status
 
-This repository currently contains the initial public documentation, Rust workspace, deterministic core primitives, minimal grid-world state/reducer types, and the first in-memory event sourcing and replay layer for direct worker actions. Schedulers, planners, persistence, distributed runtimes, and integrations have not started. 
+This repository currently contains the initial public documentation, Rust workspace, deterministic core primitives, minimal grid-world state/reducer types, the first in-memory event sourcing and replay layer for direct worker actions, and causal event records for objectives, decisions, tasks, assignments, and assigned worker actions. Schedulers, planners, persistence, distributed runtimes, and integrations have not started. 
 
 ## Roadmap Summary
 
-1. Refine event records as objective, task, and decision models become concrete.
-2. Add task assignment for miner and hauler workers. 
-3. Add constraint checks beyond the initial reducer rules.
+1. Add explicit constraint validation around objective, task, assignment, and action records. 
+2. Add deterministic task assignment for miner and hauler workers. 
+3. Refine lifecycle event validation once task state is introduced.
 4. Add persisted event logs and replay inputs when the in-memory model stabilises.
 5. Add audit views for causal inspection and failure diagnosis.
 6. Add planner integration only after kernel-side authority boundaries are explicit. 

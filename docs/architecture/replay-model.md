@@ -2,7 +2,7 @@
 
 Replay is a core safety primitive for Autonomy Kernel, not just a logging feature. The system is planned so that execution can be reconstructed from an initial state and an event sequence.
 
-First deterministic replay mechanism in place for direct worker actions. It consumes an initial `WorldState` and an in-memory sequence of event envelopes. It does not yet include persistence, objective/task replay, causal graph export, or distributed runtime suport.
+Replay consumes an initial `WorldState` and an in-memory sequence of event envelopes that may include objective, decision, task, assignment, and worker action events. It does not yet include persistence, scheduling, planning, causal graph export, or distributed runtime support.
 
 ## Replay Goal
 
@@ -18,12 +18,12 @@ If replay produces a different final state, that difference should be treated as
 
 Replay is expected to support:
 
-- Debugging unexpected behaviour.
-- Validating deterministic equivalence.
-- Comparing behaviour across implementation changes.
-- Reconstructing incidents after failure.
-- Inspecting causal chains from objective to worker action.
-- Verifying that recovery actions produced the intended state transition.
+    - Debugging unexpected behaviour.
+    - Validating deterministic equivalence.
+    - Comparing behaviour across implementation changes.
+    - Reconstructing incidents after failure.
+    - Inspecting causal chains from objective to worker action.
+    - Verifying that recovery actions produced the intended state transition.
 
 ## Event Log as Input
 
@@ -32,12 +32,14 @@ Replay should consume the accepted event log and initial state. Runtime-only sta
 This requirement influences event design: any observation or decision that can affect state must be recorded explicitly.
 
 For the current direct-action model, replay treats events as reconstruction data:
-
+    - `ObjectiveAccepted`, `DecisionEmitted`, `TaskCreated`, and `TaskAssigned` verify their event tick and do not mutate world state.
     - `ActionRequested` verifies the pre-action tick and does not mutate state.
     - `ActionApplied` reapplies the contained action through the reducer and checks the resulting tick.
     - `ActionRejected` verifies that the contained action still fails and leaves state unchanged.
 
-Malformed or inconsistent event sequences are rejected rather than skipped. Examples include duplicate event IDs, non-monotonic event IDs, tick mismatches, applied actions that fail during replay, rejected actions that now succeed, and resulting tick mismatches.
+Malformed or inconsistent action event sequences are rejected rather than skipped. Examples include duplicate event IDs, non-monotonic event IDs, tick mismatches, applied actions that fail during replay, rejected actions that now succeed, and resulting tick mismatches.
+
+Lifecycle events are currently causal and audit facts. Replay tolerates them as non-mutating records but does not yet validate a complete objective/task/assignment graph.
 
 ## State Hashing
 

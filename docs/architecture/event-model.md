@@ -4,7 +4,7 @@ Autonomy Kernel is planned around an append-only event model. Events describe ac
 
 Events should be deterministic, structured, and sufficient for causal inspection.
 
-Currently implemented is the first event layer for direct worker actions. It is intentionally in-memory and limited to the existing reducer. Objective, task, decision, persistence, and causal parent models remain future work. 
+Now extended the in-memory event layer with the first causal lineage records for objectives, decisions, tasks, assignments, and assigned worker actions. Persistence, scheduling, planning, constraint validation, and full graph validation remain future work. 
 
 ## Event Properties
 
@@ -19,15 +19,28 @@ Planned event properties include:
     - Actor or layer responsible for emission in later work.
     - State hash or transition hash where applicable in later work.
 
-The first implemented envelope contains an `EventId`, a `Tick`, and an event kind. Event IDs start at `EventId(1)` in an `EventLog` and increase deterministically as events are appended.
+The implemented envelope contains an `EventId`, a `Tick`, and an event kind. Event IDs start at `EventId(1)` in an `EventLog` and increase deterministically as events are appended.
+
+## Implemented Lifecycle Events
+
+Project records causal lifecycle facts using:
+
+    - `ObjectiveAccepted`, carrying a minimal objective.
+    - `DecisionEmitted`, carrying a minimal decision linked to an objective.
+    - `TaskCreated`, carrying a minimal task linked to an objective and optionally a decision.
+    - `TaskAssigned`, carrying an assignment that links a task to a worker.
+
+These lifecycle events are audit and causal facts at this stage. They do not mutate world state during replay.
 
 ## Implemented Action Events
 
-Now records direct worker action execution using:
+Worker action execution is recorded using:
 
     - `ActionRequested`, recorded at the pre-action tick.
     - `ActionApplied`, recorded at the post-action tick after the reducer succeeds.
     - `ActionRejected`, recorded at the unchanged pre-action tick after the reducer rejects the action.
+
+Action events may carry an optional assignment reference. Direct actions without assignment context remain valid for low-level reducer and replay testing.
 
 Rejected actions are still events. They are part of the audit history because a failed attempt can explain why state did not change.
 
@@ -58,6 +71,8 @@ This preserves the audit trail and avoids ambiguity about what the system knew a
 Given the same initial state and the same accepted event sequence, the kernel should derive the same state. Event interpretation should avoid hidden dependencies on wall-clock timing, nondeterministic ordering, or external mutable state.
 
 Where external systems are involved in later work, their observations should be captured as explicit events before they influence kernel state.
+
+Replay applies only `ActionApplied` events to world state. Lifecycle events and `ActionRequested` records do not mutate state. `ActionRejected` verifies that the action would still be rejected and also does not mutate state.
 
 ## Causal Inspection
 

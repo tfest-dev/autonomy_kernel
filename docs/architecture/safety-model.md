@@ -20,6 +20,8 @@ Workers execute assigned tasks within bounded authority. They cannot redefine ob
 
 Worker outputs are reports or action results. The kernel decides whether state deltas are accepted.
 
+The current implementation can record assignment context on worker action events. That context is causal evidence, not an implemented scheduler or permission system.
+
 ## Layered Authority
 
 Authority is bounded by layer:
