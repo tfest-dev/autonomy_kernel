@@ -1,8 +1,18 @@
+pub mod artifact;
+pub mod causal_graph;
 pub mod event_log;
 pub mod replay;
 pub mod scenario;
 pub mod verification;
 
+pub use artifact::{
+    build_causal_artifact, export_artifact_lines, export_artifact_text,
+    scheduled_mining_causal_artifact, CausalArtifact,
+};
+pub use causal_graph::{
+    build_causal_graph, export_causal_graph_lines, export_causal_graph_text, CausalEdge,
+    CausalEdgeKind, CausalGraph, CausalNode, CausalNodeId, CausalNodeKind,
+};
 pub use event_log::{
     assignment_for_action_event, events_for_assignment, record_action, record_action_with_context,
     record_action_with_policy, record_decision_emitted, record_objective_accepted,

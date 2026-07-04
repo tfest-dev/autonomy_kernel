@@ -14,6 +14,8 @@ First deterministic scenario added for `mining-bootstrap`. It uses fixed IDs, fi
 
 `scheduled-mining` added as a deterministic scheduler-driven scenario. It records scheduler output for manually created mining and deposit tasks, executes scheduled actions through policy gates, and verifies replay of the full event stream.
 
+Added deterministic causal graph artifacts derived from recorded scenario event streams. The scheduled-mining scenario is used to generate the first artifact.
+
 ## Included in V1
 
 V1 includes:
@@ -34,6 +36,7 @@ V1 includes:
     - Deterministic policy-gated action scenario with replay verification.
     - Minimal deterministic scheduler for existing mining and deposit assignments.
     - Deterministic scheduled-mining scenario with replay verification.
+    - Deterministic causal graph artifact export for recorded event streams.
 
 ## Excluded from V1
 
@@ -53,6 +56,7 @@ V1 excludes:
     - General rule engine or dynamic constraint learning.
     - General planner or automatic objective decomposition.
     - Full pathfinding or route planning.
+    - Graph viewer or interactive UI.
 
 ## Initial Scenario Shape
 
@@ -74,6 +78,7 @@ The grid world should provide enough complexity to expose coordination problems 
     - Battery constraints.
     - Policy gates.
     - Minimal scheduler output for existing assignments.
+    - Causal graph extraction from event streams.
     - Failure reporting.
     - Replay.
     - Causal inspection.

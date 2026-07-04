@@ -10,6 +10,8 @@ Deterministic failure recovery path implemented with added replay coverage for l
 
 Replay coverage added for deterministic policy gates. Policy events are non-mutating audit facts; state reconstruction still occurs through applied worker action events. Scheduler events now also covered with replay coverage where scheduler events are non-mutating audit facts; replay does not currently re-run scheduling.
 
+Causal graph artifacts that include replay verification metadata when verification has been performed. The graph artifact is derived from events and deos not perform state reconstruction.
+
 ## Replay Goal
 
 The primary replay goal is:
@@ -79,6 +81,14 @@ The scheduled-mining scenario additionally verifies:
     - Replayed state matches the scheduler-driven final state exactly.
 
 Replay does not re-run scheduling. Scheduler events are accepted audit facts, while action events remain the reconstruction mechanism.
+
+The causal graph artifact additionally verifies:
+
+    - Event streams can be transformed into deterministic inspectable proof artifacts.
+    - Replay verification metadata can be included in exported evidence.
+    - Graph extraction does not mutate world state.
+
+Replay remains the only state reconstruction mechanism. Graph artifacts are exports over the event stream, not replay inputs and not execution mechanisms.
 
 ## State Hashing
 

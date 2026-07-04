@@ -10,6 +10,8 @@ Added first-class local failure and recovery audit events. `FailureInjected` rec
 
 Extended to add scheduler decision events. `SchedulerEmitted` records the scheduler outcome for an existing assignment before policy validation or action execution.
 
+Causal graph artifacts derived from the event stream. The artifact layer does not introduce new execution events; it reads existing events and emits deterministic export text.
+
 ## Event Properties
 
 Planned event properties include:
@@ -72,7 +74,7 @@ Scheduling is recorded using:
 
     - `SchedulerEmitted`, carrying the assignment and scheduler outcome.
 
-Scheduler outcomes may contain an emitted worker action, a complete result, or a blocked reason. Scheduler events are audit facts. They do not mutate world state during replay and do not authorize execution by themselves.
+Scheduler outcomes may contain an emitted worker action, a complete result, or a blocked reason. Scheduler events are audit facts. They do not mutate world state during replay and do not authorise execution by themselves.
 
 Scheduled actions still pass through policy validation. A scheduler-emitted action can be followed by `PolicyRejected`, in which case no `ActionRequested` event is recorded.
 
@@ -114,4 +116,4 @@ Policy events and scheduler events are also audit facts. Replay verifies their e
 
 Events should make it possible to answer why a state transition occurred. A task assignment should be traceable to a task, a decision, a validated proposal, and an accepted objective.
 
-This causal chain is a core part of the audit model and should be preserved across replay and failure analysis.
+This causal chain is a core part of the audit model and should be preserved across replay and failure analysis. The causal graph artifacts provide the first deterministic extraction of this chain into graph nodes and edges. These graph artifacts are derived views over the event stream. They do not mutate state, authorise execution, or replace replay.

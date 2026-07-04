@@ -49,6 +49,8 @@ Failure recovery path records injected worker failure as a first-class audit eve
 
 Policy rejection is recorded as a first-class audit event. A policy-rejected action leaves state unchanged, does not advance tick, and does not produce an `ActionRequested` event. Similarly, scheduler output is also recorded as a first-class audit event. Scheduler events are non-mutating facts, and policy gtaes remain authoritative over scheduled actions.
 
+The causal graph artifacts are derived from those audit events. These artifacts support inspection and diagnosis, but they do not make safety decisions, authorise actions, mutate state, or replace replay verification. 
+
 ## Audit and Diagnosis
 
 Audit and replay support diagnosis by preserving the causal chain from objective to decision to action to state change. This makes it possible to inspect whether a failure resulted from planning, validation, coordination, worker execution, environmental state, or recovery logic.

@@ -4,7 +4,7 @@ Autonomy Kernel is a deterministic control substrate for AI-operated distributed
 
 It allows high-level intent to be decomposed into bounded, traceable, semi-autonomous execution while preserving repeatability, auditability, failure isolation, and constraint enforcement.
 
-Status: initial Rust workspace with deterministic world-state, in-memory action event log, replay skeleton, causal objective/task lineage, fixed mining bootstrap scenario, deterministic local failure/recovery scenario, deterministic policy gates, and a minimal deterministic scheduler. Scheduling, planning, persistence, and integration have not started.
+Status: initial Rust workspace with deterministic world-state, in-memory action event log, replay skeleton, causal objective/task lineage, fixed mining bootstrap scenario, deterministic local failure/recovery scenario, deterministic policy gates, a minimal deterministic scheduler, and deterministic causal graph artifacts. General planning, persistence, distributed supervision, UI, and integrations have not started.
 
 ## Project Purpose
 
@@ -63,11 +63,14 @@ The current scenarios are fixed deterministic flows:
     - `policy-gate` records policy rejection before reducer execution, corrected bounded action execution, and replay linkage.
     - `scheduled-mining` records scheduler output for existing tasks and assignments, policy-gated execution, and replay linkage.
 
+The first causal graph artifact export derives an inspectable decision chain from the scheduled-mining event stream. It is an export/proof structure only; replay remains the state reconstruction mechanism.
+
 ## Design Goals
 
 - Deterministic execution for comparable runs.
 - Append-only event history suitable for causal inspection.
 - Replay from event log and initial state.
+- Deterministic proof artifacts derived from event streams.
 - Explicit constraints before worker action.
 - Bounded worker authority.
 - Failure isolation and recoverable task state.
@@ -79,12 +82,13 @@ The current scenarios are fixed deterministic flows:
 - No runtime clustering in the current implementation.
 - No realistic robotics physics in V1.
 - No graphics-heavy user interface in V1.
+- No graph viewer in the current implementation.
 - No uncontrolled worker tool execution.
 - No claim that the system is production-ready or generally safe.
 
 ## Repository Status
 
-This repository currently contains the initial public documentation, Rust workspace, deterministic core primitives, minimal grid-world state/reducer types, the first in-memory event sourcing and replay layer, causal event records for objectives, decisions, tasks, assignments, assigned worker actions, deterministic mining bootstrap scenario, deterministic worker failure/recovery scenario, deterministic policy-aware action recording, and a minimal scheduler for existing mining/deposit tasks. General planners, persistence, distributed runtimes, and integrations have not started. 
+This repository currently contains the initial public documentation, Rust workspace, deterministic core primitives, minimal grid-world state/reducer types, the first in-memory event sourcing and replay layer, causal event records for objectives, decisions, tasks, assignments, assigned worker actions, deterministic mining bootstrap scenario, deterministic worker failure/recovery scenario, deterministic policy-aware action recording, a minimal scheduler for existing mining/deposit tasks, and deterministic causal graph artifact export. General planners, persistence, UI, distributed runtimes, and integrations have not started. 
 
 ## Roadmap Summary
 
