@@ -4,7 +4,7 @@ Autonomy Kernel is a deterministic control substrate for AI-operated distributed
 
 It allows high-level intent to be decomposed into bounded, traceable, semi-autonomous execution while preserving repeatability, auditability, failure isolation, and constraint enforcement.
 
-Status: initial Rust workspace with deterministic world-state, in-memory action event log, replay skeleton, causal objective/task lineage, fixed mining bootstrap scenario, deterministic local failure/recovery scenario, and deterministic policy gates. Scheduling, planning, persistence, and integration have not started
+Status: initial Rust workspace with deterministic world-state, in-memory action event log, replay skeleton, causal objective/task lineage, fixed mining bootstrap scenario, deterministic local failure/recovery scenario, deterministic policy gates, and a minimal deterministic scheduler. Scheduling, planning, persistence, and integration have not started.
 
 ## Project Purpose
 
@@ -61,6 +61,7 @@ The current scenarios are fixed deterministic flows:
     - `mining-bootstrap` records objective, decision, task, assignment, worker action, event, state change, and replay linkage.
     - `worker-failure` records local worker failure, rejected disabled-worker action, explicit repair, resumed work, and replay linkage.
     - `policy-gate` records policy rejection before reducer execution, corrected bounded action execution, and replay linkage.
+    - `scheduled-mining` records scheduler output for existing tasks and assignments, policy-gated execution, and replay linkage.
 
 ## Design Goals
 
@@ -83,13 +84,13 @@ The current scenarios are fixed deterministic flows:
 
 ## Repository Status
 
-This repository currently contains the initial public documentation, Rust workspace, deterministic core primitives, minimal grid-world state/reducer types, the first in-memory event sourcing and replay layer, causal event records for objectives, decisions, tasks, assignments, assigned worker actions, deterministic mining bootstrap scenario, deterministic worker failure/recovery scenario, and deterministic policy-aware action recording. Schedulers, planners, persistence, distributed runtimes, and integrations have not started.
+This repository currently contains the initial public documentation, Rust workspace, deterministic core primitives, minimal grid-world state/reducer types, the first in-memory event sourcing and replay layer, causal event records for objectives, decisions, tasks, assignments, assigned worker actions, deterministic mining bootstrap scenario, deterministic worker failure/recovery scenario, deterministic policy-aware action recording, and a minimal scheduler for existing mining/deposit tasks. General planners, persistence, distributed runtimes, and integrations have not started. 
 
 ## Roadmap Summary
 
 1. Extend constraint validation from direct worker actions toward objectives, tasks, and assignments.
 2. Add deterministic task assignment for miner and hauler workers. 
-3. Expand scenario coverage for battery constraints and recovery edge cases.
+3. Expand scheduler coverage for battery constraints and recovery edge cases.
 4. Add persisted event logs and replay inputs when the in-memory model stabilises.
 5. Add audit views for causal inspection and failure diagnosis.
 6. Add planner or distributed runtime integration only after kernel-side authority boundaries are explicit. 

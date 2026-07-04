@@ -6,6 +6,7 @@ pub mod objective;
 pub mod policy;
 pub mod reducer;
 pub mod scenario;
+pub mod scheduler;
 pub mod task;
 pub mod world;
 
@@ -28,5 +29,6 @@ pub use scenario::{
     MINING_BOOTSTRAP_STOCKPILE_MINIMUM, MINING_BOOTSTRAP_STORAGE_ID, MINING_BOOTSTRAP_TASK_ID,
     MINING_BOOTSTRAP_WORKER_BATTERY, MINING_BOOTSTRAP_WORKER_ID,
 };
+pub use scheduler::{schedule_next_action, ScheduleBlockReason, ScheduleOutcome};
 pub use task::{Decision, DecisionKind, Task, TaskKind};
 pub use world::WorldState;

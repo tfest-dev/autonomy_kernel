@@ -1,21 +1,25 @@
 use std::error::Error;
 use std::fmt;
 
-use autonomy_core::{Position, Quantity, ResourceNodeId, SimError, StorageId, Tick, WorkerId};
+use autonomy_core::{
+    AssignmentId, Position, Quantity, ResourceNodeId, SimError, StorageId, TaskId, Tick, WorkerId,
+};
 use autonomy_sim::{
     build_mining_bootstrap_world, mining_bootstrap_actions, mining_bootstrap_assignment,
     mining_bootstrap_decision, mining_bootstrap_objective, mining_bootstrap_task,
-    objective_satisfied, stockpile_quantity, ActionPolicy, PolicyError, ResourceKind, WorkerAction,
-    WorkerStatus, WorldState, MINING_BOOTSTRAP_ASSIGNMENT_ID, MINING_BOOTSTRAP_EXPECTED_FINAL_TICK,
-    MINING_BOOTSTRAP_EXPECTED_NODE_IRON, MINING_BOOTSTRAP_EXPECTED_STORAGE_IRON,
-    MINING_BOOTSTRAP_NODE_ID, MINING_BOOTSTRAP_STORAGE_ID, MINING_BOOTSTRAP_WORKER_ID,
+    objective_satisfied, stockpile_quantity, ActionPolicy, Assignment, PolicyError, ResourceKind,
+    Task, TaskKind, WorkerAction, WorkerStatus, WorldState, MINING_BOOTSTRAP_ASSIGNMENT_ID,
+    MINING_BOOTSTRAP_EXPECTED_FINAL_TICK, MINING_BOOTSTRAP_EXPECTED_NODE_IRON,
+    MINING_BOOTSTRAP_EXPECTED_STORAGE_IRON, MINING_BOOTSTRAP_NODE_ID,
+    MINING_BOOTSTRAP_OBJECTIVE_ID, MINING_BOOTSTRAP_STORAGE_ID, MINING_BOOTSTRAP_WORKER_ID,
 };
 
 use crate::{
     event_log::{
         record_action_with_context, record_action_with_policy, record_decision_emitted,
-        record_objective_accepted, record_task_assigned, record_task_created,
-        record_worker_failure, record_worker_recovery, EventEnvelope, EventLog, ExecutionError,
+        record_objective_accepted, record_scheduled_step, record_task_assigned,
+        record_task_created, record_worker_failure, record_worker_recovery, EventEnvelope,
+        EventLog, ExecutionError, ScheduledExecutionError,
     },
     replay::ReplayError,
     verification::verify_replay,
@@ -23,6 +27,8 @@ use crate::{
 
 const POLICY_GATE_REJECTED_MINE_QUANTITY: Quantity = Quantity(20);
 const POLICY_GATE_EXPECTED_FINAL_TICK: Tick = Tick(2);
+const SCHEDULED_MINING_DEPOSIT_TASK_ID: TaskId = TaskId(2);
+const SCHEDULED_MINING_DEPOSIT_ASSIGNMENT_ID: AssignmentId = AssignmentId(2);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ScenarioRun {
@@ -306,6 +312,56 @@ pub fn run_policy_gate() -> Result<ScenarioRun, ScenarioError> {
     })
 }
 
+pub fn run_scheduled_mining() -> Result<ScenarioRun, ScenarioError> {
+    let initial_state = build_mining_bootstrap_world();
+    let objective = mining_bootstrap_objective();
+    let mine_task = mining_bootstrap_task();
+    let mine_assignment = mining_bootstrap_assignment();
+    let deposit_task = scheduled_mining_deposit_task();
+    let deposit_assignment = scheduled_mining_deposit_assignment();
+    let policy = scheduled_mining_policy();
+    let mut final_state = initial_state.clone();
+    let mut log = EventLog::new();
+
+    record_objective_accepted(&mut log, initial_state.tick, objective.clone());
+    record_decision_emitted(&mut log, initial_state.tick, mining_bootstrap_decision());
+    record_task_created(&mut log, initial_state.tick, mine_task.clone());
+    record_task_assigned(&mut log, initial_state.tick, mine_assignment.clone());
+
+    final_state = scheduled_step(
+        &final_state,
+        &mut log,
+        &mine_task,
+        &mine_assignment,
+        &policy,
+    )?;
+
+    record_task_created(&mut log, final_state.tick, deposit_task.clone());
+    record_task_assigned(&mut log, final_state.tick, deposit_assignment.clone());
+
+    final_state = scheduled_step(
+        &final_state,
+        &mut log,
+        &deposit_task,
+        &deposit_assignment,
+        &policy,
+    )?;
+
+    validate_scheduled_mining_final_state(&final_state)?;
+    if !objective_satisfied(&final_state, &objective, MINING_BOOTSTRAP_STORAGE_ID) {
+        return Err(ScenarioError::ObjectiveNotSatisfied);
+    }
+
+    verify_replay(&initial_state, log.events(), &final_state)
+        .map_err(ScenarioError::ReplayFailed)?;
+
+    Ok(ScenarioRun {
+        initial_state,
+        final_state,
+        events: log.events().to_vec(),
+    })
+}
+
 pub fn validate_mining_bootstrap_final_state(state: &WorldState) -> Result<(), ScenarioError> {
     let storage = state.storage.get(&MINING_BOOTSTRAP_STORAGE_ID).ok_or(
         ScenarioError::ExpectedStorageMissing(MINING_BOOTSTRAP_STORAGE_ID),
@@ -396,6 +452,10 @@ pub fn validate_policy_gate_final_state(state: &WorldState) -> Result<(), Scenar
     Ok(())
 }
 
+pub fn validate_scheduled_mining_final_state(state: &WorldState) -> Result<(), ScenarioError> {
+    validate_policy_gate_final_state(state)
+}
+
 pub fn validate_worker_failure_recovery_final_state(
     state: &WorldState,
 ) -> Result<(), ScenarioError> {
@@ -453,6 +513,51 @@ pub fn mining_bootstrap_stockpile_quantity(state: &WorldState) -> Quantity {
     stockpile_quantity(state, MINING_BOOTSTRAP_STORAGE_ID, ResourceKind::Iron)
 }
 
+fn scheduled_mining_policy() -> ActionPolicy {
+    ActionPolicy {
+        min_battery_reserve: Some(Quantity::ONE),
+        allow_disable_worker: false,
+        allow_repair_worker: false,
+        max_mine_quantity: Some(MINING_BOOTSTRAP_EXPECTED_STORAGE_IRON),
+    }
+}
+
+fn scheduled_mining_deposit_task() -> Task {
+    Task {
+        id: SCHEDULED_MINING_DEPOSIT_TASK_ID,
+        objective_id: MINING_BOOTSTRAP_OBJECTIVE_ID,
+        decision_id: None,
+        kind: TaskKind::DepositResource {
+            storage_id: MINING_BOOTSTRAP_STORAGE_ID,
+        },
+    }
+}
+
+fn scheduled_mining_deposit_assignment() -> Assignment {
+    Assignment {
+        id: SCHEDULED_MINING_DEPOSIT_ASSIGNMENT_ID,
+        task_id: SCHEDULED_MINING_DEPOSIT_TASK_ID,
+        worker_id: MINING_BOOTSTRAP_WORKER_ID,
+    }
+}
+
+fn scheduled_step(
+    state: &WorldState,
+    log: &mut EventLog,
+    task: &Task,
+    assignment: &Assignment,
+    policy: &ActionPolicy,
+) -> Result<WorldState, ScenarioError> {
+    record_scheduled_step(state, log, task, assignment, policy).map_err(|error| match error {
+        ScheduledExecutionError::Execution(ExecutionError::Policy(error)) => {
+            ScenarioError::PolicyFailed(error)
+        }
+        ScheduledExecutionError::Execution(ExecutionError::Sim(error)) => {
+            ScenarioError::ActionFailed(error)
+        }
+    })
+}
+
 fn policy_gate_policy() -> ActionPolicy {
     ActionPolicy {
         min_battery_reserve: Some(Quantity::ONE),
@@ -467,7 +572,7 @@ mod tests {
     use autonomy_core::{EventId, Position, Quantity, SimError, Tick};
     use autonomy_sim::{
         build_mining_bootstrap_world, mining_bootstrap_objective, objective_satisfied, PolicyError,
-        WorkerAction, WorkerStatus, MINING_BOOTSTRAP_ASSIGNMENT_ID,
+        ScheduleOutcome, WorkerAction, WorkerStatus, MINING_BOOTSTRAP_ASSIGNMENT_ID,
         MINING_BOOTSTRAP_EXPECTED_FINAL_TICK, MINING_BOOTSTRAP_EXPECTED_NODE_IRON,
         MINING_BOOTSTRAP_EXPECTED_STORAGE_IRON, MINING_BOOTSTRAP_INITIAL_NODE_IRON,
         MINING_BOOTSTRAP_NODE_ID, MINING_BOOTSTRAP_STORAGE_ID, MINING_BOOTSTRAP_WORKER_ID,
@@ -482,8 +587,9 @@ mod tests {
         replay::replay_events,
         scenario::{
             mining_bootstrap_stockpile_quantity, run_mining_bootstrap, run_policy_gate,
-            run_worker_failure_recovery, validate_mining_bootstrap_final_state,
-            validate_policy_gate_final_state, validate_worker_failure_recovery_final_state,
+            run_scheduled_mining, run_worker_failure_recovery,
+            validate_mining_bootstrap_final_state, validate_policy_gate_final_state,
+            validate_scheduled_mining_final_state, validate_worker_failure_recovery_final_state,
         },
         verify_replay,
     };
@@ -1033,6 +1139,117 @@ mod tests {
     fn running_policy_gate_scenario_twice_produces_identical_events_and_final_state() {
         let first = run_policy_gate().expect("first run should succeed");
         let second = run_policy_gate().expect("second run should succeed");
+
+        assert_eq!(first.initial_state, second.initial_state);
+        assert_eq!(first.final_state, second.final_state);
+        assert_eq!(first.events, second.events);
+    }
+
+    #[test]
+    fn scheduled_mining_scenario_final_state_satisfies_stockpile_objective() {
+        let run = run_scheduled_mining().expect("scheduled mining scenario should run");
+        let objective = mining_bootstrap_objective();
+
+        assert!(objective_satisfied(
+            &run.final_state,
+            &objective,
+            MINING_BOOTSTRAP_STORAGE_ID
+        ));
+        validate_scheduled_mining_final_state(&run.final_state)
+            .expect("final state should validate");
+    }
+
+    #[test]
+    fn scheduled_mining_scenario_records_scheduler_policy_and_action_events() {
+        let run = run_scheduled_mining().expect("scheduled mining scenario should run");
+
+        assert_eq!(run.events.len(), 14);
+        assert!(matches!(
+            run.events[0].kind,
+            EventKind::ObjectiveAccepted { .. }
+        ));
+        assert!(matches!(
+            run.events[1].kind,
+            EventKind::DecisionEmitted { .. }
+        ));
+        assert!(matches!(run.events[2].kind, EventKind::TaskCreated { .. }));
+        assert!(matches!(run.events[3].kind, EventKind::TaskAssigned { .. }));
+        assert!(matches!(
+            run.events[4].kind,
+            EventKind::SchedulerEmitted {
+                assignment_id: MINING_BOOTSTRAP_ASSIGNMENT_ID,
+                outcome: ScheduleOutcome::Action {
+                    action: WorkerAction::Mine { .. },
+                    ..
+                },
+            }
+        ));
+        assert!(matches!(
+            run.events[5].kind,
+            EventKind::PolicyAccepted { .. }
+        ));
+        assert!(matches!(
+            run.events[6].kind,
+            EventKind::ActionRequested {
+                action: WorkerAction::Mine { .. },
+                ..
+            }
+        ));
+        assert!(matches!(
+            run.events[7].kind,
+            EventKind::ActionApplied {
+                action: WorkerAction::Mine { .. },
+                ..
+            }
+        ));
+        assert!(matches!(run.events[8].kind, EventKind::TaskCreated { .. }));
+        assert!(matches!(run.events[9].kind, EventKind::TaskAssigned { .. }));
+        assert!(matches!(
+            run.events[10].kind,
+            EventKind::SchedulerEmitted {
+                assignment_id: super::SCHEDULED_MINING_DEPOSIT_ASSIGNMENT_ID,
+                outcome: ScheduleOutcome::Action {
+                    action: WorkerAction::Deposit { .. },
+                    ..
+                },
+            }
+        ));
+    }
+
+    #[test]
+    fn scheduled_mining_scenario_preserves_assignment_context() {
+        let run = run_scheduled_mining().expect("scheduled mining scenario should run");
+
+        for event in &run.events[4..8] {
+            assert_eq!(
+                event.kind.assignment_id(),
+                Some(MINING_BOOTSTRAP_ASSIGNMENT_ID)
+            );
+        }
+        for event in &run.events[10..] {
+            assert_eq!(
+                event.kind.assignment_id(),
+                Some(super::SCHEDULED_MINING_DEPOSIT_ASSIGNMENT_ID)
+            );
+        }
+    }
+
+    #[test]
+    fn scheduled_mining_scenario_replay_reproduces_final_state() {
+        let run = run_scheduled_mining().expect("scheduled mining scenario should run");
+
+        let replayed =
+            replay_events(&run.initial_state, &run.events).expect("replay should succeed");
+
+        assert_eq!(replayed, run.final_state);
+        verify_replay(&run.initial_state, &run.events, &run.final_state)
+            .expect("verification should pass");
+    }
+
+    #[test]
+    fn running_scheduled_mining_scenario_twice_produces_identical_events_and_final_state() {
+        let first = run_scheduled_mining().expect("first run should succeed");
+        let second = run_scheduled_mining().expect("second run should succeed");
 
         assert_eq!(first.initial_state, second.initial_state);
         assert_eq!(first.final_state, second.final_state);

@@ -8,6 +8,8 @@ Now extended the in-memory event layer with the first causal lineage records for
 
 Added first-class local failure and recovery audit events. `FailureInjected` records deterministic failure injection. `RecoveryEmitted` records explicit recovery before the repair action is applied through the normal action event path. Now also included is deterministic policy events for direct worker actions. `PolicyAccepted` records that an action passed the current action policy before reducer execution. `PolicyRejected` records that the kernel refused to attempt an action because policy blocked it.
 
+Extended to add scheduler decision events. `SchedulerEmitted` records the scheduler outcome for an existing assignment before policy validation or action execution.
+
 ## Event Properties
 
 Planned event properties include:
@@ -64,6 +66,16 @@ Policy rejection is distinct from reducer rejection:
 
 `PolicyRejected` does not emit `ActionRequested`, does not mutate world state, and does not advance the world tick.
 
+## Implemented Scheduler Events
+
+Scheduling is recorded using:
+
+    - `SchedulerEmitted`, carrying the assignment and scheduler outcome.
+
+Scheduler outcomes may contain an emitted worker action, a complete result, or a blocked reason. Scheduler events are audit facts. They do not mutate world state during replay and do not authorize execution by themselves.
+
+Scheduled actions still pass through policy validation. A scheduler-emitted action can be followed by `PolicyRejected`, in which case no `ActionRequested` event is recorded.
+
 ## Planned Event Categories
 
 The broader event model should eventually cover:
@@ -96,7 +108,7 @@ Replay applies only `ActionApplied` events to world state. Lifecycle events and 
 
 Failure and recovery lifecycle events are audit facts. Worker status changes occur only through applied `DisableWorker` and `RepairWorker` actions.
 
-Policy events are also audit facts. Replay verifies their event tick and ordering but does not re-run policy validation yet.
+Policy events and scheduler events are also audit facts. Replay verifies their event tick and ordering but does not re-run policy validation or scheduling yet.
 
 ## Causal Inspection
 

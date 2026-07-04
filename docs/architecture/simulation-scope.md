@@ -12,6 +12,8 @@ First deterministic scenario added for `mining-bootstrap`. It uses fixed IDs, fi
 
 `policy-gate` added as a deterministic validation scenario. It records an oversized mine action as `PolicyRejected`, then records corrected bounded actions through the normal policy-accepted action path and verifies replay of the full event stream.
 
+`scheduled-mining` added as a deterministic scheduler-driven scenario. It records scheduler output for manually created mining and deposit tasks, executes scheduled actions through policy gates, and verifies replay of the full event stream.
+
 ## Included in V1
 
 V1 includes:
@@ -30,6 +32,8 @@ V1 includes:
     - Deterministic mining bootstrap scenario with replay verification.
     - Deterministic worker failure and local recovery scenario with replay verification.
     - Deterministic policy-gated action scenario with replay verification.
+    - Minimal deterministic scheduler for existing mining and deposit assignments.
+    - Deterministic scheduled-mining scenario with replay verification.
 
 ## Excluded from V1
 
@@ -47,6 +51,8 @@ V1 excludes:
     - Advanced routing.
     - Dynamic hierarchy.
     - General rule engine or dynamic constraint learning.
+    - General planner or automatic objective decomposition.
+    - Full pathfinding or route planning.
 
 ## Initial Scenario Shape
 
@@ -67,6 +73,7 @@ The grid world should provide enough complexity to expose coordination problems 
     - Worker authority.
     - Battery constraints.
     - Policy gates.
+    - Minimal scheduler output for existing assignments.
     - Failure reporting.
     - Replay.
     - Causal inspection.

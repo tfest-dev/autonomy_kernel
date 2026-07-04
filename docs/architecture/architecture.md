@@ -38,6 +38,8 @@ The coordination kernel is the deterministic centre of the system. It accepts va
 
 State changes flow through the kernel. Events are the source of truth. Runtime state should be derivable from the initial state plus the accepted event sequence.
 
+Includes a minimal deterministic scheduler inside the current grid-world boundary. It selects the next worker action for existing tasks and assignments. It does not create objectives, decisions, tasks, or assignments.
+
 ## Supervision Layer
 
 The supervision layer observes execution, detects failures, coordinates retries or recovery actions, and maintains worker lifecycle state.
@@ -59,8 +61,8 @@ The world or external system is the environment affected by worker action. In V1
 The initial Rust workspace separates shared deterministic primitives from the V1 proving environment:
 
   - `autonomy-core` contains typed identifiers, event identifiers, objective/decision/task/assignment identifiers, ticks, positions, quantities, and deterministic reducer errors.
-  - `autonomy-sim` contains grid-world entities, worker status, direct worker and failure actions, action policy validation, objective/task/assignment data contracts, world state, the pure action reducer, and deterministic scenario construction helpers.
-  - `autonomy-replay` contains the in-memory append-only event log, causal lifecycle recording helpers, policy-aware action recording, failure/recovery recording helpers, assigned action recording flow, deterministic replay, replay verification, and scenario runners.
+  - `autonomy-sim` contains grid-world entities, worker status, direct worker and failure actions, action policy validation, minimal scheduler logic, objective/task/assignment data contracts, world state, the pure action reducer, and deterministic scenario construction helpers.
+  - `autonomy-replay` contains the in-memory append-only event log, causal lifecycle recording helpers, scheduler decision recording, policy-aware action recording, failure/recovery recording helpers, assigned action recording flow, deterministic replay, replay verification, and scenario runners.
 
 Future crates for audit and command-line workflows remain scaffolded but unimplemented.
 
@@ -77,3 +79,5 @@ Data contracts for objective, decision, task, and assignment lineage now integra
 Deterministic local worker failure and repair semantics now in place. This is not distributed supervision and does not introduce BEAM/Erlang/Elixir integration yet.
 
 Deterministic action policy gates in place. Policy rejection happens before reducer execution and is distinct from reducer rejection. Scheduling, planning, and automatic replanning remain unimplemented.
+
+Now added scheduler output for existing assignments only. Policy gates remain authoritative over scheduled actions. This is not a general planner or autonomous reasoning layer. 

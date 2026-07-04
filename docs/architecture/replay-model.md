@@ -8,7 +8,7 @@ Added a deterministic mining bootstrap scenario that verifies replay of a full o
 
 Deterministic failure recovery path implemented with added replay coverage for local failure and recovery. The replay path reconstructs worker disablement, rejected disabled-worker action, explicit repair, resumed work, and final objective satisfaction from the event stream. 
 
-Replay coverage added for deterministic policy gates. Policy events are non-mutating audit facts; state reconstruction still occurs through applied worker action events.
+Replay coverage added for deterministic policy gates. Policy events are non-mutating audit facts; state reconstruction still occurs through applied worker action events. Scheduler events now also covered with replay coverage where scheduler events are non-mutating audit facts; replay does not currently re-run scheduling.
 
 ## Replay Goal
 
@@ -39,6 +39,7 @@ This requirement influences event design: any observation or decision that can a
 
 For the current direct-action model, replay treats events as reconstruction data:
     - `ObjectiveAccepted`, `DecisionEmitted`, `TaskCreated`, and `TaskAssigned` verify their event tick and do not mutate world state.
+    - `SchedulerEmitted` verifies its event tick and does not mutate world state.
     - `PolicyAccepted` and `PolicyRejected` verify their event tick and do not mutate world state.
     - `ActionRequested` verifies the pre-action tick and does not mutate state.
     - `ActionApplied` reapplies the contained action through the reducer and checks the resulting tick.
@@ -69,6 +70,15 @@ The policy-gate scenario additionally verifies:
     - Replayed state matches the policy-gated final state exactly.
 
 Replay does not re-run policy validation. Policy events are accepted audit facts, while action events remain the reconstruction mechanism.
+
+The scheduled-mining scenario additionally verifies:
+
+    - Scheduler output is recorded before policy validation.
+    - Policy-accepted scheduled actions proceed through the normal action event path.
+    - Scheduler events do not mutate world state during replay.
+    - Replayed state matches the scheduler-driven final state exactly.
+
+Replay does not re-run scheduling. Scheduler events are accepted audit facts, while action events remain the reconstruction mechanism.
 
 ## State Hashing
 

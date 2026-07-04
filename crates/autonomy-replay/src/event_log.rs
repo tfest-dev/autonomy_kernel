@@ -3,8 +3,9 @@ use std::fmt;
 
 use autonomy_core::{AssignmentId, EventId, SimError, Tick, WorkerId};
 use autonomy_sim::{
-    apply_action, validate_action_policy, ActionContext, ActionPolicy, Assignment, Decision,
-    FailureReason, Objective, PolicyError, RecoveryKind, Task, WorkerAction, WorldState,
+    apply_action, schedule_next_action, validate_action_policy, ActionContext, ActionPolicy,
+    Assignment, Decision, FailureReason, Objective, PolicyError, RecoveryKind, ScheduleOutcome,
+    Task, WorkerAction, WorldState,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -36,6 +37,10 @@ pub enum EventKind {
         worker_id: WorkerId,
         recovery: RecoveryKind,
     },
+    SchedulerEmitted {
+        assignment_id: AssignmentId,
+        outcome: ScheduleOutcome,
+    },
     PolicyAccepted {
         action: WorkerAction,
         context: ActionContext,
@@ -65,6 +70,7 @@ impl EventKind {
     pub fn assignment_id(&self) -> Option<AssignmentId> {
         match self {
             Self::TaskAssigned { assignment } => Some(assignment.id),
+            Self::SchedulerEmitted { assignment_id, .. } => Some(*assignment_id),
             Self::ActionRequested { context, .. }
             | Self::ActionApplied { context, .. }
             | Self::ActionRejected { context, .. }
@@ -95,6 +101,21 @@ impl fmt::Display for ExecutionError {
 }
 
 impl Error for ExecutionError {}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ScheduledExecutionError {
+    Execution(ExecutionError),
+}
+
+impl fmt::Display for ScheduledExecutionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Execution(error) => write!(f, "scheduled action failed: {error}"),
+        }
+    }
+}
+
+impl Error for ScheduledExecutionError {}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EventLog {
@@ -230,6 +251,32 @@ pub fn record_action_with_policy(
     }
 }
 
+pub fn record_scheduled_step(
+    state: &WorldState,
+    log: &mut EventLog,
+    task: &Task,
+    assignment: &Assignment,
+    policy: &ActionPolicy,
+) -> Result<WorldState, ScheduledExecutionError> {
+    let outcome = schedule_next_action(state, task, assignment);
+    log.append(
+        state.tick,
+        EventKind::SchedulerEmitted {
+            assignment_id: assignment.id,
+            outcome: outcome.clone(),
+        },
+    );
+
+    match outcome {
+        ScheduleOutcome::Action {
+            assignment_id,
+            action,
+        } => record_action_with_policy(state, log, action, Some(assignment_id), policy)
+            .map_err(ScheduledExecutionError::Execution),
+        ScheduleOutcome::Complete { .. } | ScheduleOutcome::Blocked { .. } => Ok(state.clone()),
+    }
+}
+
 pub fn record_objective_accepted(
     log: &mut EventLog,
     tick: Tick,
@@ -323,13 +370,17 @@ pub fn events_for_assignment(
 mod tests {
     use autonomy_core::{Position, Quantity, SimError, Tick};
     use autonomy_sim::{
-        build_mining_bootstrap_world, ActionPolicy, PolicyError, WorkerAction,
-        MINING_BOOTSTRAP_ASSIGNMENT_ID, MINING_BOOTSTRAP_EXPECTED_STORAGE_IRON,
-        MINING_BOOTSTRAP_NODE_ID, MINING_BOOTSTRAP_WORKER_ID,
+        build_mining_bootstrap_world, mining_bootstrap_assignment, mining_bootstrap_task,
+        ActionPolicy, PolicyError, ScheduleOutcome, WorkerAction, MINING_BOOTSTRAP_ASSIGNMENT_ID,
+        MINING_BOOTSTRAP_EXPECTED_STORAGE_IRON, MINING_BOOTSTRAP_NODE_ID,
+        MINING_BOOTSTRAP_WORKER_ID,
     };
 
     use crate::{
-        event_log::{record_action_with_policy, EventKind, EventLog, ExecutionError},
+        event_log::{
+            record_action_with_policy, record_scheduled_step, EventKind, EventLog, ExecutionError,
+            ScheduledExecutionError,
+        },
         replay::replay_events,
     };
 
@@ -503,5 +554,151 @@ mod tests {
         let replayed =
             replay_events(&state, log.events()).expect("policy event replay should succeed");
         assert_eq!(replayed, next);
+    }
+
+    #[test]
+    fn scheduled_step_records_scheduler_emitted() {
+        let state = build_mining_bootstrap_world();
+        let mut log = EventLog::new();
+
+        let _ = record_scheduled_step(
+            &state,
+            &mut log,
+            &mining_bootstrap_task(),
+            &mining_bootstrap_assignment(),
+            &ActionPolicy::default(),
+        )
+        .expect("scheduled step should succeed");
+
+        assert!(matches!(
+            log.events()[0].kind,
+            EventKind::SchedulerEmitted { .. }
+        ));
+        assert_eq!(log.events()[0].tick, state.tick);
+    }
+
+    #[test]
+    fn scheduled_action_preserves_assignment_context() {
+        let state = build_mining_bootstrap_world();
+        let mut log = EventLog::new();
+
+        let _ = record_scheduled_step(
+            &state,
+            &mut log,
+            &mining_bootstrap_task(),
+            &mining_bootstrap_assignment(),
+            &ActionPolicy::default(),
+        )
+        .expect("scheduled step should succeed");
+
+        assert!(matches!(
+            log.events()[0].kind,
+            EventKind::SchedulerEmitted {
+                assignment_id: MINING_BOOTSTRAP_ASSIGNMENT_ID,
+                ..
+            }
+        ));
+        for event in &log.events()[1..] {
+            assert_eq!(
+                event.kind.assignment_id(),
+                Some(MINING_BOOTSTRAP_ASSIGNMENT_ID)
+            );
+        }
+    }
+
+    #[test]
+    fn scheduled_step_uses_policy_aware_recording() {
+        let state = build_mining_bootstrap_world();
+        let mut log = EventLog::new();
+
+        let _ = record_scheduled_step(
+            &state,
+            &mut log,
+            &mining_bootstrap_task(),
+            &mining_bootstrap_assignment(),
+            &ActionPolicy::default(),
+        )
+        .expect("scheduled step should succeed");
+
+        assert!(matches!(
+            log.events()[0].kind,
+            EventKind::SchedulerEmitted { .. }
+        ));
+        assert!(matches!(
+            log.events()[1].kind,
+            EventKind::PolicyAccepted { .. }
+        ));
+        assert!(matches!(
+            log.events()[2].kind,
+            EventKind::ActionRequested { .. }
+        ));
+        assert!(matches!(
+            log.events()[3].kind,
+            EventKind::ActionApplied { .. }
+        ));
+    }
+
+    #[test]
+    fn policy_rejection_after_scheduler_emission_does_not_record_action_requested() {
+        let state = build_mining_bootstrap_world();
+        let before = state.clone();
+        let mut log = EventLog::new();
+        let policy = ActionPolicy {
+            max_mine_quantity: Some(Quantity::new(5)),
+            ..ActionPolicy::default()
+        };
+
+        let result = record_scheduled_step(
+            &state,
+            &mut log,
+            &mining_bootstrap_task(),
+            &mining_bootstrap_assignment(),
+            &policy,
+        );
+
+        assert!(matches!(
+            result,
+            Err(ScheduledExecutionError::Execution(ExecutionError::Policy(
+                PolicyError::MineQuantityLimitExceeded { .. }
+            )))
+        ));
+        assert_eq!(state, before);
+        assert_eq!(state.tick, Tick::ZERO);
+        assert_eq!(log.len(), 2);
+        assert!(matches!(
+            log.events()[0].kind,
+            EventKind::SchedulerEmitted {
+                outcome: ScheduleOutcome::Action { .. },
+                ..
+            }
+        ));
+        assert!(matches!(
+            log.events()[1].kind,
+            EventKind::PolicyRejected { .. }
+        ));
+        assert!(!log
+            .events()
+            .iter()
+            .any(|event| matches!(event.kind, EventKind::ActionRequested { .. })));
+    }
+
+    #[test]
+    fn scheduler_events_replay_as_non_mutating_audit_facts() {
+        let state = build_mining_bootstrap_world();
+        let mut log = EventLog::new();
+        log.append(
+            state.tick,
+            EventKind::SchedulerEmitted {
+                assignment_id: MINING_BOOTSTRAP_ASSIGNMENT_ID,
+                outcome: ScheduleOutcome::Complete {
+                    assignment_id: MINING_BOOTSTRAP_ASSIGNMENT_ID,
+                },
+            },
+        );
+
+        let replayed =
+            replay_events(&state, log.events()).expect("scheduler event replay should succeed");
+
+        assert_eq!(replayed, state);
     }
 }

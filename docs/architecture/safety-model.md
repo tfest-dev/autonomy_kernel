@@ -24,6 +24,8 @@ Worker outputs are reports or action results. The kernel decides whether state d
 
 The current implementation can record assignment context on worker action events. That context is causal evidence, not an implemented scheduler or permission system. It also models local worker disablement and repair. Disabled workers cannot perform normal worker actions. Failure injection and recovery are explicit events and replay-compatible, but this is not a distributed supervision system. 
 
+Now includes a minimal scheduler that emits next worker actions for existing assignments. Scheduler output is not execution authority. Scheduled actions must still pass through policy gates before reducer execution.
+
 ## Layered Authority
 
 Authority is bounded by layer:
@@ -45,7 +47,7 @@ The system should avoid hidden partial success where possible. If partial progre
 
 Failure recovery path records injected worker failure as a first-class audit event and applies disablement through the reducer. Recovery is recorded explicitly before a repair action is applied.
 
-Policy rejection is recorded as a first-class audit event. A policy-rejected action leaves state unchanged, does not advance tick, and does not produce an `ActionRequested` event.
+Policy rejection is recorded as a first-class audit event. A policy-rejected action leaves state unchanged, does not advance tick, and does not produce an `ActionRequested` event. Similarly, scheduler output is also recorded as a first-class audit event. Scheduler events are non-mutating facts, and policy gtaes remain authoritative over scheduled actions.
 
 ## Audit and Diagnosis
 
