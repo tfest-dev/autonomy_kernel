@@ -56,6 +56,8 @@ Future supervision layers may use fault-tolerant message-passing runtimes, but V
 
 Added an optional BEAM/Elixir adaptor experiment under `adaptors/beam`. It demonstrates adaptor-level OTP supervision for deterministic scenario-style request messages. It does not move kernel logic into BEAM. Rust remains authoritative for world state, reducer semantics, policy gates, scheduler output, proposal validation, event interpretation, replay, and causal graph artifacts. The BEAM adaptor does not execute Rust through ports, NIFs, FFI, HTTP, or shell commands. 
 
+`autonomy-cli` adds a deterministic Rust CLI boundary that exposes known scenario execution and causal artifact export as stable process output. It does not add networking, persistence, an interactive UI, or BEAM-to-Rust invocation.
+
 ## Worker Runtime
 
 The worker runtime executes bounded tasks issued by the kernel. Workers have limited authority and must report structured outcomes.
@@ -73,10 +75,9 @@ The initial Rust workspace separates shared deterministic primitives from the V1
   - `autonomy-core` contains typed identifiers, event identifiers, objective/decision/task/assignment identifiers, ticks, positions, quantities, and deterministic reducer errors.
   - `autonomy-sim` contains grid-world entities, worker status, direct worker and failure actions, action policy validation, proposal parsing and validation, minimal scheduler logic, objective/task/assignment data contracts, world state, the pure action reducer, and deterministic scenario construction helpers.
   - `autonomy-replay` contains the in-memory append-only event log, proposal and causal lifecycle recording helpers, scheduler decision recording, policy-aware action recording, failure/recovery recording helpers, assigned action recording flow, deterministic replay, replay verification, causal graph artifact export, and scenario runners.
+  - `autonomy-cli` contains the deterministic command-line boundary for listing scenarios, running scenarios, and exporting causal artifacts.
 
-Future crates for audit and command-line workflows remain scaffolded but unimplemented.
-
-Future crates for replay, audit, and command-line workflows remain scaffolded but unimplemented. 
+Future audit workflows remain scaffolded but unimplemented.
 
 ## Separation of Reasoning and Execution
 
@@ -95,3 +96,5 @@ Now added scheduler output for existing assignments only. Policy gates remain au
 Causal graph artifacts for inspection now added. Does not add UI, graph viewer, persistence system, planner, or execution pathway.
 
 Deterministic proposal adaptor boundary in place. It does not add live LLM calls, prompt templates, provider routing, automatic natural-language planning, or automatic task decomposition beyond explicit conversion of accepted structured proposals. Adaptor-level supervision also now added with the optional BEAM integration. It does not add distributed BEAM clustering, production orchestration, networking, persistence, or cross-runtime execution. 
+
+CLI process output only implementation. External adaptors may call this CLI in future work, but no adaptor invocation path is implemented yet.

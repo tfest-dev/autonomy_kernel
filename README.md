@@ -4,7 +4,7 @@ Autonomy Kernel is a deterministic control substrate for AI-operated distributed
 
 It allows high-level intent to be decomposed into bounded, traceable, semi-autonomous execution while preserving repeatability, auditability, failure isolation, and constraint enforcement.
 
-Status: initial Rust workspace with deterministic world-state, in-memory action event log, replay skeleton, causal objective/task lineage, fixed mining bootstrap scenario, deterministic local failure/recovery scenario, deterministic policy gates, a minimal deterministic scheduler, deterministic causal graph artifacts, a constrained proposal adaptor boundary, and an optional BEAM supervision adaptor experiment. Live model calls, general planning, persistence, distributed supervision, UI, and integrations have not started.
+Status: initial Rust workspace with deterministic world-state, in-memory action event log, replay skeleton, causal objective/task lineage, fixed mining bootstrap scenario, deterministic local failure/recovery scenario, deterministic policy gates, a minimal deterministic scheduler, deterministic causal graph artifacts, a constrained proposal adaptor boundary, an optional BEAM supervision adaptor experiment, and a deterministic Rust CLI boundary. Live model calls, general planning, persistence, distributed supervision, UI, and integrations have not started.
 
 ## Project Purpose
 
@@ -24,6 +24,8 @@ Reasoning and execution are separate concerns. Proposals may originate from a pl
 The current proposal adaptor is local and deterministic. It parses a constrained line-based input format into structured proposal data, validates references against the current world state, and records proposal acceptance or rejection. It does not call an LLM or any external provider.
 
 The optional BEAM adaptor is a supervision boundary experiment only. Rust remains the deterministic kernel and owns state, replay, scheduler, policy, reducer, proposal, event, and artifact semantics. The BEAM adaptor currently acknowledges deterministic scenario-style requests and demonstrates process supervision; it does not execute Rust.
+
+The Rust CLI provides deterministic commands for listing known scenarios, running known scenarios, and exporting causal artifacts. It is intended as a future process boundary for external supervisors, but currently does not make any adaptor call it. 
 
 ## Problem Statement
 

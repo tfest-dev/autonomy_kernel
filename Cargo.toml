@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/autonomy-cli",
     "crates/autonomy-core",
     "crates/autonomy-replay",
     "crates/autonomy-sim",
