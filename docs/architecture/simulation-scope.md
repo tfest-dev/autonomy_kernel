@@ -18,6 +18,8 @@ Added deterministic causal graph artifacts derived from recorded scenario event 
 
 `proposal-adaptor`, a deterministic scenario for the local proposal boundary, now implemented. It records a rejected constrained proposal, records an accepted constrained proposal, converts the accepted proposal into lifecycle records, then executes through the existing scheduler and policy gates.
 
+BEAM supervision adaptor experiment added as optional add-on. It supervises a scenario-worker process that returns deterministic boundary responses for known scenario names. It does not execute Rust scenarios or change simulation semantics. 
+
 ## Included in V1
 
 V1 includes:
@@ -39,13 +41,15 @@ V1 includes:
     - Minimal deterministic scheduler for existing mining and deposit assignments.
     - Deterministic scheduled-mining scenario with replay verification.
     - Deterministic causal graph artifact export for recorded event streams.
+    - Optional BEAM adaptor scaffold for supervision-boundary experimentation.
 
 ## Excluded from V1
 
 V1 excludes:
 
-    - LLM planning.
-    - Erlang/Elixir runtime.
+    - Live LLM calls or provider integrations.
+    - Production Erlang/Elixir runtime integration.
+    - Distributed BEAM clustering.
     - Distributed supervision.
     - Multi-region clustering.
     - Realistic robotics physics.
@@ -59,6 +63,7 @@ V1 excludes:
     - General planner or automatic objective decomposition.
     - Full pathfinding or route planning.
     - Graph viewer or interactive UI.
+    - Rust execution through BEAM ports, NIFs, FFI, HTTP, or shell commands.
 
 ## Initial Scenario Shape
 
@@ -79,6 +84,7 @@ The grid world should provide enough complexity to expose coordination problems 
     - Worker authority.
     - Battery constraints.
     - Policy gates.
+    - Optional adaptor-level BEAM supervision boundary.
     - Minimal scheduler output for existing assignments.
     - Causal graph extraction from event streams.
     - Failure reporting.

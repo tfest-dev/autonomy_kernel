@@ -777,7 +777,7 @@ mod tests {
         assert_eq!(replayed, state);
     }
 
-        #[test]
+    #[test]
     fn parse_failure_records_proposal_received_and_rejected_only() {
         let state = build_mining_bootstrap_world();
         let mut log = EventLog::new();

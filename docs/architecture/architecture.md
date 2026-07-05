@@ -54,6 +54,8 @@ The supervision layer observes execution, detects failures, coordinates retries 
 
 Future supervision layers may use fault-tolerant message-passing runtimes, but V1 does not commit to a specific runtime or language ecosystem.
 
+Added an optional BEAM/Elixir adaptor experiment under `adaptors/beam`. It demonstrates adaptor-level OTP supervision for deterministic scenario-style request messages. It does not move kernel logic into BEAM. Rust remains authoritative for world state, reducer semantics, policy gates, scheduler output, proposal validation, event interpretation, replay, and causal graph artifacts. The BEAM adaptor does not execute Rust through ports, NIFs, FFI, HTTP, or shell commands. 
+
 ## Worker Runtime
 
 The worker runtime executes bounded tasks issued by the kernel. Workers have limited authority and must report structured outcomes.
@@ -92,4 +94,4 @@ Now added scheduler output for existing assignments only. Policy gates remain au
 
 Causal graph artifacts for inspection now added. Does not add UI, graph viewer, persistence system, planner, or execution pathway.
 
-Deterministic proposal adaptor boundary in place. It does not add live LLM calls, prompt templates, provider routing, automatic natural-language planning, or automatic task decomposition beyond explicit conversion of accepted structured proposals.
+Deterministic proposal adaptor boundary in place. It does not add live LLM calls, prompt templates, provider routing, automatic natural-language planning, or automatic task decomposition beyond explicit conversion of accepted structured proposals. Adaptor-level supervision also now added with the optional BEAM integration. It does not add distributed BEAM clustering, production orchestration, networking, persistence, or cross-runtime execution. 

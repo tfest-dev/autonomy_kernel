@@ -1343,7 +1343,7 @@ mod tests {
         assert_eq!(first.events, second.events);
     }
 
-        #[test]
+    #[test]
     fn proposal_adaptor_scenario_records_rejected_then_accepted_proposal_flow() {
         let run = run_proposal_adaptor().expect("proposal adaptor scenario should run");
 

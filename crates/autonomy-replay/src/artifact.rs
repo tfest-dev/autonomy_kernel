@@ -169,7 +169,7 @@ mod tests {
         assert_eq!(before, after);
     }
 
-        #[test]
+    #[test]
     fn proposal_adaptor_artifact_generation_is_deterministic() {
         let first =
             proposal_adaptor_causal_artifact().expect("proposal-adaptor artifact should build");

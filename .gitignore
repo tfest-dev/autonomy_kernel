@@ -10,3 +10,6 @@ Cargo.lock
 *.log
 artifacts/runs/*
 !artifacts/runs/.gitkeep
+adaptors/beam/_build/
+adaptors/beam/deps/
+adaptors/beam/*.ez
