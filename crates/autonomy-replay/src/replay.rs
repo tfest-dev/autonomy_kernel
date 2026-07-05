@@ -119,7 +119,11 @@ pub fn replay_events(
         validate_event_id(event.id, previous_id)?;
 
         match &event.kind {
-            EventKind::ObjectiveAccepted { .. }
+            EventKind::ProposalReceived { .. }
+            | EventKind::ProposalParsed { .. }
+            | EventKind::ProposalAccepted { .. }
+            | EventKind::ProposalRejected { .. }
+            | EventKind::ObjectiveAccepted { .. }
             | EventKind::DecisionEmitted { .. }
             | EventKind::TaskCreated { .. }
             | EventKind::TaskAssigned { .. }

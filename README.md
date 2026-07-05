@@ -4,7 +4,7 @@ Autonomy Kernel is a deterministic control substrate for AI-operated distributed
 
 It allows high-level intent to be decomposed into bounded, traceable, semi-autonomous execution while preserving repeatability, auditability, failure isolation, and constraint enforcement.
 
-Status: initial Rust workspace with deterministic world-state, in-memory action event log, replay skeleton, causal objective/task lineage, fixed mining bootstrap scenario, deterministic local failure/recovery scenario, deterministic policy gates, a minimal deterministic scheduler, and deterministic causal graph artifacts. General planning, persistence, distributed supervision, UI, and integrations have not started.
+Status: initial Rust workspace with deterministic world-state, in-memory action event log, replay skeleton, causal objective/task lineage, fixed mining bootstrap scenario, deterministic local failure/recovery scenario, deterministic policy gates, a minimal deterministic scheduler, deterministic causal graph artifacts, and a constrained proposal adaptor boundary. Live model calls, general planning, persistence, distributed supervision, UI, and integrations have not started.
 
 ## Project Purpose
 
@@ -20,6 +20,8 @@ Workers execute.
 Events prove what happened.
 
 Reasoning and execution are separate concerns. Proposals may originate from a planner, model, operator, or deterministic rule, but state changes must flow through the kernel and be represented by durable events.
+
+The current proposal adaptor is local and deterministic. It parses a constrained line-based input format into structured proposal data, validates references against the current world state, and records proposal acceptance or rejection. It does not call an LLM or any external provider.
 
 ## Problem Statement
 
@@ -62,6 +64,7 @@ The current scenarios are fixed deterministic flows:
     - `worker-failure` records local worker failure, rejected disabled-worker action, explicit repair, resumed work, and replay linkage.
     - `policy-gate` records policy rejection before reducer execution, corrected bounded action execution, and replay linkage.
     - `scheduled-mining` records scheduler output for existing tasks and assignments, policy-gated execution, and replay linkage.
+    - `proposal-adaptor` records rejected and accepted constrained proposal inputs, converts the accepted proposal into kernel lifecycle records, then executes through scheduler and policy gates.
 
 The first causal graph artifact export derives an inspectable decision chain from the scheduled-mining event stream. It is an export/proof structure only; replay remains the state reconstruction mechanism.
 
@@ -72,13 +75,14 @@ The first causal graph artifact export derives an inspectable decision chain fro
 - Replay from event log and initial state.
 - Deterministic proof artifacts derived from event streams.
 - Explicit constraints before worker action.
+- Deterministic proposal validation before kernel lifecycle records are created.
 - Bounded worker authority.
 - Failure isolation and recoverable task state.
 - Clear separation between proposal, decision, execution, and evidence.
 
 ## Non-Goals
 
-- No LLM integration in the current implementation
+- No live LLM or provider integration in the current implementation.
 - No runtime clustering in the current implementation.
 - No realistic robotics physics in V1.
 - No graphics-heavy user interface in V1.
@@ -88,13 +92,13 @@ The first causal graph artifact export derives an inspectable decision chain fro
 
 ## Repository Status
 
-This repository currently contains the initial public documentation, Rust workspace, deterministic core primitives, minimal grid-world state/reducer types, the first in-memory event sourcing and replay layer, causal event records for objectives, decisions, tasks, assignments, assigned worker actions, deterministic mining bootstrap scenario, deterministic worker failure/recovery scenario, deterministic policy-aware action recording, a minimal scheduler for existing mining/deposit tasks, and deterministic causal graph artifact export. General planners, persistence, UI, distributed runtimes, and integrations have not started. 
+This repository currently contains the initial public documentation, Rust workspace, deterministic core primitives, minimal grid-world state/reducer types, the first in-memory event sourcing and replay layer, causal event records for objectives, decisions, tasks, assignments, assigned worker actions, deterministic mining bootstrap scenario, deterministic worker failure/recovery scenario, deterministic policy-aware action recording, a minimal scheduler for existing mining/deposit tasks, deterministic causal graph artifact export, and a constrained proposal-adaptor scenario. General planners, live LLM calls, persistence, UI, distributed runtimes, and integrations have not started. 
 
 ## Roadmap Summary
 
-1. Extend constraint validation from direct worker actions toward objectives, tasks, and assignments.
+1. Extend proposal and constraint validation from the current grid-world shape toward richer objective and task schemas.
 2. Add deterministic task assignment for miner and hauler workers. 
 3. Expand scheduler coverage for battery constraints and recovery edge cases.
 4. Add persisted event logs and replay inputs when the in-memory model stabilises.
 5. Add audit views for causal inspection and failure diagnosis.
-6. Add planner or distributed runtime integration only after kernel-side authority boundaries are explicit. 
+6. Add live model or distributed runtime integration only after kernel-side authority boundaries are explicit.

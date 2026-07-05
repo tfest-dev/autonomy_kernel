@@ -12,6 +12,8 @@ Extended to add scheduler decision events. `SchedulerEmitted` records the schedu
 
 Causal graph artifacts derived from the event stream. The artifact layer does not introduce new execution events; it reads existing events and emits deterministic export text.
 
+Proposal lifecycle events for a constrained local adaptor boundary in place. Proposal events record whether untrusted proposal text was received, parsed, accepted, or rejected. No live model call or external provider is involved.
+
 ## Event Properties
 
 Planned event properties include:
@@ -29,6 +31,15 @@ The implemented envelope contains an `EventId`, a `Tick`, and an event kind. Eve
 
 ## Implemented Lifecycle Events
 
+Proposal facts recorded using:
+
+    - `ProposalReceived`, carrying the constrained proposal text.
+    - `ProposalParsed`, carrying a structured parsed proposal.
+    - `ProposalAccepted`, carrying a parsed proposal that passed world-state validation.
+    - `ProposalRejected`, carrying a structured parse or validation rejection.
+
+Proposal lifecycle events are audit facts. They do not mutate world state during replay. A rejected proposal does not create objectives, tasks, assignments, scheduler outputs, actions, or state transitions.
+
 Project records causal lifecycle facts using:
 
     - `ObjectiveAccepted`, carrying a minimal objective.
@@ -37,6 +48,8 @@ Project records causal lifecycle facts using:
     - `TaskAssigned`, carrying an assignment that links a task to a worker.
 
 These lifecycle events are audit and causal facts at this stage. They do not mutate world state during replay.
+
+Accepted proposals become kernel work only when separate objective, decision, task, and assignment lifecycle events are recorded. Acceptance does not directly execute actions.
 
 ## Implemented Action Events
 
@@ -68,6 +81,8 @@ Policy rejection is distinct from reducer rejection:
 
 `PolicyRejected` does not emit `ActionRequested`, does not mutate world state, and does not advance the world tick.
 
+Proposal rejection is distinct from both. `ProposalRejected` means untrusted proposal input did not become kernel work at all.
+
 ## Implemented Scheduler Events
 
 Scheduling is recorded using:
@@ -83,6 +98,7 @@ Scheduled actions still pass through policy validation. A scheduler-emitted acti
 The broader event model should eventually cover:
 
     - Objective accepted.
+    - Proposal received, parsed, accepted, or rejected.
     - Proposal validated or rejected.
     - Decision emitted.
     - Task created.
@@ -108,6 +124,8 @@ Where external systems are involved in later work, their observations should be 
 
 Replay applies only `ActionApplied` events to world state. Lifecycle events and `ActionRequested` records do not mutate state. `ActionRejected` verifies that the action would still be rejected and also does not mutate state.
 
+Proposal events are non-mutating audit facts. Replay verifies their event tick and ordering but does not re-run proposal parsing or validation yet.
+
 Failure and recovery lifecycle events are audit facts. Worker status changes occur only through applied `DisableWorker` and `RepairWorker` actions.
 
 Policy events and scheduler events are also audit facts. Replay verifies their event tick and ordering but does not re-run policy validation or scheduling yet.
@@ -117,3 +135,5 @@ Policy events and scheduler events are also audit facts. Replay verifies their e
 Events should make it possible to answer why a state transition occurred. A task assignment should be traceable to a task, a decision, a validated proposal, and an accepted objective.
 
 This causal chain is a core part of the audit model and should be preserved across replay and failure analysis. The causal graph artifacts provide the first deterministic extraction of this chain into graph nodes and edges. These graph artifacts are derived views over the event stream. They do not mutate state, authorise execution, or replace replay.
+
+Causal inspection is extended with proposal accepted and rejected paths. The graph links an accepted proposal to following objective lifecycle recrods only where the event sequence makes that relationship explicit. 

@@ -3,9 +3,10 @@ use std::fmt;
 
 use autonomy_core::{AssignmentId, EventId, SimError, Tick, WorkerId};
 use autonomy_sim::{
-    apply_action, schedule_next_action, validate_action_policy, ActionContext, ActionPolicy,
-    Assignment, Decision, FailureReason, Objective, PolicyError, RecoveryKind, ScheduleOutcome,
-    Task, WorkerAction, WorldState,
+    apply_action, parse_proposal_text, schedule_next_action, validate_action_policy,
+    validate_proposal_against_world, ActionContext, ActionPolicy, Assignment, Decision,
+    FailureReason, Objective, ParsedProposal, PolicyError, ProposalRejection, RecoveryKind,
+    ScheduleOutcome, Task, WorkerAction, WorldState,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -17,6 +18,18 @@ pub struct EventEnvelope {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum EventKind {
+    ProposalReceived {
+        text: String,
+    },
+    ProposalParsed {
+        proposal: ParsedProposal,
+    },
+    ProposalAccepted {
+        proposal: ParsedProposal,
+    },
+    ProposalRejected {
+        rejection: ProposalRejection,
+    },
     ObjectiveAccepted {
         objective: Objective,
     },
@@ -77,6 +90,10 @@ impl EventKind {
             | Self::PolicyAccepted { context, .. }
             | Self::PolicyRejected { context, .. } => context.assignment_id,
             Self::ObjectiveAccepted { .. }
+            | Self::ProposalReceived { .. }
+            | Self::ProposalParsed { .. }
+            | Self::ProposalAccepted { .. }
+            | Self::ProposalRejected { .. }
             | Self::DecisionEmitted { .. }
             | Self::TaskCreated { .. }
             | Self::FailureInjected { .. }
@@ -305,6 +322,63 @@ pub fn record_task_assigned(
     log.append(tick, EventKind::TaskAssigned { assignment })
 }
 
+pub fn record_proposal_text(log: &mut EventLog, tick: Tick, text: String) -> EventEnvelope {
+    log.append(tick, EventKind::ProposalReceived { text })
+}
+
+pub fn record_proposal_parsed(
+    log: &mut EventLog,
+    tick: Tick,
+    proposal: ParsedProposal,
+) -> EventEnvelope {
+    log.append(tick, EventKind::ProposalParsed { proposal })
+}
+
+pub fn record_proposal_accepted(
+    log: &mut EventLog,
+    tick: Tick,
+    proposal: ParsedProposal,
+) -> EventEnvelope {
+    log.append(tick, EventKind::ProposalAccepted { proposal })
+}
+
+pub fn record_proposal_rejected(
+    log: &mut EventLog,
+    tick: Tick,
+    rejection: ProposalRejection,
+) -> EventEnvelope {
+    log.append(tick, EventKind::ProposalRejected { rejection })
+}
+
+pub fn parse_validate_and_record_proposal(
+    state: &WorldState,
+    log: &mut EventLog,
+    text: &str,
+) -> Result<ParsedProposal, ProposalRejection> {
+    let tick = state.tick;
+    record_proposal_text(log, tick, text.to_string());
+
+    let proposal = match parse_proposal_text(text) {
+        Ok(proposal) => proposal,
+        Err(error) => {
+            let rejection = ProposalRejection::Parse(error);
+            record_proposal_rejected(log, tick, rejection.clone());
+            return Err(rejection);
+        }
+    };
+
+    record_proposal_parsed(log, tick, proposal.clone());
+
+    if let Err(error) = validate_proposal_against_world(&proposal, state) {
+        let rejection = ProposalRejection::Validation(error);
+        record_proposal_rejected(log, tick, rejection.clone());
+        return Err(rejection);
+    }
+
+    record_proposal_accepted(log, tick, proposal.clone());
+    Ok(proposal)
+}
+
 pub fn record_worker_failure(
     state: &WorldState,
     log: &mut EventLog,
@@ -371,15 +445,16 @@ mod tests {
     use autonomy_core::{Position, Quantity, SimError, Tick};
     use autonomy_sim::{
         build_mining_bootstrap_world, mining_bootstrap_assignment, mining_bootstrap_task,
-        ActionPolicy, PolicyError, ScheduleOutcome, WorkerAction, MINING_BOOTSTRAP_ASSIGNMENT_ID,
+        ActionPolicy, PolicyError, ProposalError, ProposalRejection, ProposalValidationError,
+        ScheduleOutcome, WorkerAction, MINING_BOOTSTRAP_ASSIGNMENT_ID,
         MINING_BOOTSTRAP_EXPECTED_STORAGE_IRON, MINING_BOOTSTRAP_NODE_ID,
-        MINING_BOOTSTRAP_WORKER_ID,
+        MINING_BOOTSTRAP_STORAGE_ID, MINING_BOOTSTRAP_WORKER_ID,
     };
 
     use crate::{
         event_log::{
-            record_action_with_policy, record_scheduled_step, EventKind, EventLog, ExecutionError,
-            ScheduledExecutionError,
+            parse_validate_and_record_proposal, record_action_with_policy, record_scheduled_step,
+            EventKind, EventLog, ExecutionError, ScheduledExecutionError,
         },
         replay::replay_events,
     };
@@ -699,6 +774,141 @@ mod tests {
         let replayed =
             replay_events(&state, log.events()).expect("scheduler event replay should succeed");
 
+        assert_eq!(replayed, state);
+    }
+
+        #[test]
+    fn parse_failure_records_proposal_received_and_rejected_only() {
+        let state = build_mining_bootstrap_world();
+        let mut log = EventLog::new();
+
+        let result = parse_validate_and_record_proposal(
+            &state,
+            &mut log,
+            "objective=maintain_stockpile\nresource=copper\nminimum=10\nworker_id=1\nresource_node_id=1\nstorage_id=1\nmine_quantity=10",
+        );
+
+        assert_eq!(
+            result,
+            Err(ProposalRejection::Parse(
+                ProposalError::UnsupportedResource("copper".to_string())
+            ))
+        );
+        assert_eq!(log.len(), 2);
+        assert!(matches!(
+            log.events()[0].kind,
+            EventKind::ProposalReceived { .. }
+        ));
+        assert!(matches!(
+            log.events()[1].kind,
+            EventKind::ProposalRejected { .. }
+        ));
+        assert!(!log.events().iter().any(|event| matches!(
+            event.kind,
+            EventKind::ObjectiveAccepted { .. }
+                | EventKind::TaskCreated { .. }
+                | EventKind::TaskAssigned { .. }
+                | EventKind::SchedulerEmitted { .. }
+                | EventKind::ActionRequested { .. }
+        )));
+    }
+
+    #[test]
+    fn validation_failure_records_received_parsed_and_rejected_only() {
+        let state = build_mining_bootstrap_world();
+        let mut log = EventLog::new();
+
+        let result = parse_validate_and_record_proposal(
+            &state,
+            &mut log,
+            "objective=maintain_stockpile\nresource=iron\nminimum=10\nworker_id=99\nresource_node_id=1\nstorage_id=1\nmine_quantity=10",
+        );
+
+        assert_eq!(
+            result,
+            Err(ProposalRejection::Validation(
+                ProposalValidationError::UnknownWorker {
+                    worker_id: autonomy_core::WorkerId::new(99),
+                }
+            ))
+        );
+        assert_eq!(log.len(), 3);
+        assert!(matches!(
+            log.events()[0].kind,
+            EventKind::ProposalReceived { .. }
+        ));
+        assert!(matches!(
+            log.events()[1].kind,
+            EventKind::ProposalParsed { .. }
+        ));
+        assert!(matches!(
+            log.events()[2].kind,
+            EventKind::ProposalRejected { .. }
+        ));
+        assert!(!log.events().iter().any(|event| matches!(
+            event.kind,
+            EventKind::ObjectiveAccepted { .. }
+                | EventKind::TaskCreated { .. }
+                | EventKind::TaskAssigned { .. }
+                | EventKind::SchedulerEmitted { .. }
+                | EventKind::ActionRequested { .. }
+        )));
+    }
+
+    #[test]
+    fn accepted_proposal_records_received_parsed_and_accepted() {
+        let state = build_mining_bootstrap_world();
+        let mut log = EventLog::new();
+
+        let proposal = parse_validate_and_record_proposal(
+            &state,
+            &mut log,
+            "objective=maintain_stockpile\nresource=iron\nminimum=10\nworker_id=1\nresource_node_id=1\nstorage_id=1\nmine_quantity=10",
+        )
+        .expect("proposal should be accepted");
+
+        assert_eq!(proposal.worker_id, MINING_BOOTSTRAP_WORKER_ID);
+        assert_eq!(proposal.resource_node_id, MINING_BOOTSTRAP_NODE_ID);
+        assert_eq!(proposal.storage_id, MINING_BOOTSTRAP_STORAGE_ID);
+        assert_eq!(log.len(), 3);
+        assert!(matches!(
+            log.events()[0].kind,
+            EventKind::ProposalReceived { .. }
+        ));
+        assert!(matches!(
+            log.events()[1].kind,
+            EventKind::ProposalParsed { .. }
+        ));
+        assert!(matches!(
+            log.events()[2].kind,
+            EventKind::ProposalAccepted { .. }
+        ));
+        assert!(log.events().iter().all(|event| event.tick == Tick::ZERO));
+    }
+
+    #[test]
+    fn proposal_rejection_does_not_advance_tick_and_replays_without_mutation() {
+        let state = build_mining_bootstrap_world();
+        let before = state.clone();
+        let mut log = EventLog::new();
+
+        let result = parse_validate_and_record_proposal(
+            &state,
+            &mut log,
+            "objective=maintain_stockpile\nresource=iron\nminimum=10\nworker_id=1\nresource_node_id=1\nstorage_id=1\nmine_quantity=999",
+        );
+
+        assert!(matches!(
+            result,
+            Err(ProposalRejection::Validation(
+                ProposalValidationError::InsufficientResource { .. }
+            ))
+        ));
+        assert_eq!(state, before);
+        assert_eq!(state.tick, Tick::ZERO);
+
+        let replayed =
+            replay_events(&state, log.events()).expect("proposal event replay should succeed");
         assert_eq!(replayed, state);
     }
 }

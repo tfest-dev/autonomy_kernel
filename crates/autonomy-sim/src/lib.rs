@@ -4,6 +4,7 @@ pub mod entity;
 pub mod failure;
 pub mod objective;
 pub mod policy;
+pub mod proposal;
 pub mod reducer;
 pub mod scenario;
 pub mod scheduler;
@@ -18,6 +19,11 @@ pub use entity::{
 pub use failure::{FailureReason, RecoveryKind};
 pub use objective::{Objective, ObjectiveKind};
 pub use policy::{validate_action_policy, ActionPolicy, PolicyError};
+pub use proposal::{
+    accepted_proposal_to_plan, parse_proposal_text, validate_proposal_against_world,
+    ParsedProposal, ProposalError, ProposalPlan, ProposalPlanIds, ProposalRejection, ProposalText,
+    ProposalValidationError, ProposedObjective,
+};
 pub use reducer::apply_action;
 pub use scenario::{
     build_mining_bootstrap_world, mining_bootstrap_actions, mining_bootstrap_assignment,

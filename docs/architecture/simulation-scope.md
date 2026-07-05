@@ -16,6 +16,8 @@ First deterministic scenario added for `mining-bootstrap`. It uses fixed IDs, fi
 
 Added deterministic causal graph artifacts derived from recorded scenario event streams. The scheduled-mining scenario is used to generate the first artifact.
 
+`proposal-adaptor`, a deterministic scenario for the local proposal boundary, now implemented. It records a rejected constrained proposal, records an accepted constrained proposal, converts the accepted proposal into lifecycle records, then executes through the existing scheduler and policy gates.
+
 ## Included in V1
 
 V1 includes:

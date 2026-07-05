@@ -3,7 +3,7 @@ use crate::{
         build_causal_graph, export_causal_graph_lines, export_causal_graph_text, CausalGraph,
     },
     event_log::EventEnvelope,
-    scenario::{run_scheduled_mining, ScenarioError},
+    scenario::{run_proposal_adaptor, run_scheduled_mining, ScenarioError},
     verification::verify_replay,
 };
 
@@ -34,6 +34,14 @@ pub fn scheduled_mining_causal_artifact() -> Result<CausalArtifact, ScenarioErro
         .map_err(ScenarioError::ReplayFailed)?;
 
     Ok(build_causal_artifact("scheduled-mining", &run.events, true))
+}
+
+pub fn proposal_adaptor_causal_artifact() -> Result<CausalArtifact, ScenarioError> {
+    let run = run_proposal_adaptor()?;
+    verify_replay(&run.initial_state, &run.events, &run.final_state)
+        .map_err(ScenarioError::ReplayFailed)?;
+
+    Ok(build_causal_artifact("proposal-adaptor", &run.events, true))
 }
 
 pub fn export_artifact_text(artifact: &CausalArtifact) -> String {
@@ -97,7 +105,10 @@ fn escape_line_field(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use crate::{
-        artifact::{export_artifact_lines, export_artifact_text, scheduled_mining_causal_artifact},
+        artifact::{
+            export_artifact_lines, export_artifact_text, proposal_adaptor_causal_artifact,
+            scheduled_mining_causal_artifact,
+        },
         scenario::run_scheduled_mining,
     };
 
@@ -156,5 +167,23 @@ mod tests {
         let after = run_scheduled_mining().expect("scheduled-mining should still run");
 
         assert_eq!(before, after);
+    }
+
+        #[test]
+    fn proposal_adaptor_artifact_generation_is_deterministic() {
+        let first =
+            proposal_adaptor_causal_artifact().expect("proposal-adaptor artifact should build");
+        let second =
+            proposal_adaptor_causal_artifact().expect("proposal-adaptor artifact should build");
+
+        assert_eq!(first, second);
+        assert_eq!(first.scenario_name, "proposal-adaptor");
+        assert!(first.replay_verified);
+        assert_eq!(export_artifact_text(&first), export_artifact_text(&second));
+        assert_eq!(
+            export_artifact_lines(&first),
+            export_artifact_lines(&second)
+        );
+        assert!(export_artifact_lines(&first).contains("artifact|scenario|proposal-adaptor\n"));
     }
 }

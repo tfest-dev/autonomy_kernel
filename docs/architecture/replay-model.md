@@ -12,6 +12,8 @@ Replay coverage added for deterministic policy gates. Policy events are non-muta
 
 Causal graph artifacts that include replay verification metadata when verification has been performed. The graph artifact is derived from events and deos not perform state reconstruction.
 
+Added replay coverage for proposal events. Proposal events are non-mutating audit facts; replace does not re-run proposal parsing or validation in this work packge. 
+
 ## Replay Goal
 
 The primary replay goal is:
@@ -41,6 +43,7 @@ This requirement influences event design: any observation or decision that can a
 
 For the current direct-action model, replay treats events as reconstruction data:
     - `ObjectiveAccepted`, `DecisionEmitted`, `TaskCreated`, and `TaskAssigned` verify their event tick and do not mutate world state.
+    - `ProposalReceived`, `ProposalParsed`, `ProposalAccepted`, and `ProposalRejected` verify their event tick and do not mutate world state.
     - `SchedulerEmitted` verifies its event tick and does not mutate world state.
     - `PolicyAccepted` and `PolicyRejected` verify their event tick and do not mutate world state.
     - `ActionRequested` verifies the pre-action tick and does not mutate state.
@@ -89,6 +92,15 @@ The causal graph artifact additionally verifies:
     - Graph extraction does not mutate world state.
 
 Replay remains the only state reconstruction mechanism. Graph artifacts are exports over the event stream, not replay inputs and not execution mechanisms.
+
+The proposal-adaptor scenario additionally verifies:
+
+    - Rejected proposals do not create executable work.
+    - Accepted proposals create lifecycle records separately from proposal acceptance.
+    - Scheduler and policy gates remain downstream of accepted proposal conversion.
+    - Replayed state matches the proposal-driven final state exactly.
+
+Replay does not re-run proposal parsing or validation. Proposal events are accepted audit facts, while action events remain the reconstruction mechanism.
 
 ## State Hashing
 

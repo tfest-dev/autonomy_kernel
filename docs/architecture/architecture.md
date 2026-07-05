@@ -24,11 +24,15 @@ The intent planner decomposes human intent into candidate objectives, tasks, or 
 
 Planner output is advisory. It proposes possible work but does not execute actions and does not directly change the authoritative state.
 
+Local adaptor boundary layer added for LLM-style proposals. It parses a constrained line-based proposal format into structured data and validates it before kernel lifecycle records are created. It does not call a model, provider, network service, or a planner. 
+
 ## Constraint Validator
 
 The constraint validator checks proposed objectives, tasks, and actions against schemas, policies, current state, and authority boundaries.
 
 Invalid proposals should be rejected before they reach execution. Rejections should be represented as events with enough context for later inspection.
+
+Proposal rejection is distinct from policy rejection and reducer rejection. `ProposalRejected` means untrusted proposal input did not become kernel work. `PolicyRejected` means a worker action was refused before reducer execution. `ActionRejected` means the reducer atempted the action and state rules rejected it. 
 
 The first narrow action policy gate implemented for the grid-world worker model. It validates direct worker actions before reducer execution and records policy acceptance or rejection as structured events. This is not yet a general constraint engine.
 
@@ -41,6 +45,8 @@ State changes flow through the kernel. Events are the source of truth. Runtime s
 Includes a minimal deterministic scheduler inside the current grid-world boundary. It selects the next worker action for existing tasks and assignments. It does not create objectives, decisions, tasks, or assignments.
 
 Deterministic causal graph artifact extraction from recorded event streams now in place. These artifacts do not mutate state and are not part of execution.
+
+Accepted adaptor proposals create objective, decision, task, and assignment records only through explicit lifecycle events. They do not directly execute actions. Scheduler and policy gates remain downstream authority boundaries.
 
 ## Supervision Layer
 
@@ -63,8 +69,8 @@ The world or external system is the environment affected by worker action. In V1
 The initial Rust workspace separates shared deterministic primitives from the V1 proving environment:
 
   - `autonomy-core` contains typed identifiers, event identifiers, objective/decision/task/assignment identifiers, ticks, positions, quantities, and deterministic reducer errors.
-  - `autonomy-sim` contains grid-world entities, worker status, direct worker and failure actions, action policy validation, minimal scheduler logic, objective/task/assignment data contracts, world state, the pure action reducer, and deterministic scenario construction helpers.
-  - `autonomy-replay` contains the in-memory append-only event log, causal lifecycle recording helpers, scheduler decision recording, policy-aware action recording, failure/recovery recording helpers, assigned action recording flow, deterministic replay, replay verification, causal graph artifact export, and scenario runners.
+  - `autonomy-sim` contains grid-world entities, worker status, direct worker and failure actions, action policy validation, proposal parsing and validation, minimal scheduler logic, objective/task/assignment data contracts, world state, the pure action reducer, and deterministic scenario construction helpers.
+  - `autonomy-replay` contains the in-memory append-only event log, proposal and causal lifecycle recording helpers, scheduler decision recording, policy-aware action recording, failure/recovery recording helpers, assigned action recording flow, deterministic replay, replay verification, causal graph artifact export, and scenario runners.
 
 Future crates for audit and command-line workflows remain scaffolded but unimplemented.
 
@@ -85,3 +91,5 @@ Deterministic action policy gates in place. Policy rejection happens before redu
 Now added scheduler output for existing assignments only. Policy gates remain authoritative over scheduled actions. This is not a general planner or autonomous reasoning layer. 
 
 Causal graph artifacts for inspection now added. Does not add UI, graph viewer, persistence system, planner, or execution pathway.
+
+Deterministic proposal adaptor boundary in place. It does not add live LLM calls, prompt templates, provider routing, automatic natural-language planning, or automatic task decomposition beyond explicit conversion of accepted structured proposals.

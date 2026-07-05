@@ -1,8 +1,8 @@
 # Decision Chain Artifacts
 
-WP08 introduces deterministic causal graph artifacts for recorded event streams.
+WP08 introduces deterministic causal graph artifacts for recorded event streams. This is extended with adaptor boundary layer extending the artifcats with proposal accepted and rejected paths. 
 
-A causal graph artifact is an inspectable export derived from the event log. It turns recorded facts into nodes and edges that show how an objective led to decisions, tasks, assignments, scheduler output, policy outcomes, worker actions, state transitions, rejections, and replay verification.
+A causal graph artifact is an inspectable export derived from the event log. It turns recorded facts into nodes and edges that show how a proposal or objective led to decisions, tasks, assignments, scheduler output, policy outcomes, worker actions, state transitions, rejections, and replay verification.
 
 The artifact is proof-oriented. It is not an execution mechanism, planner, scheduler, graph database, UI, or visualisation layer.
 
@@ -14,6 +14,9 @@ The graph does not change events, mutate world state, or influence replay. It on
 
 Current graph nodes include:
 
+- Proposal.
+- Proposal accepted.
+- Proposal rejected.
 - Objective.
 - Decision.
 - Task.
@@ -27,7 +30,7 @@ Current graph nodes include:
 - Recovery.
 - Replay verification.
 
-Current graph edges are created from explicit IDs, assignment context, or tightly adjacent lifecycle/action pairs such as failure to disable-worker action and recovery to repair-worker action.
+Current graph edges are created from explicit IDs, assignment context, or tightly adjacent lifecycle/action pairs such as proposal accepted to objective accepted, failure to disable-worker action, and recovery to repair-worker action.
 
 If a relationship is not explicit enough to establish safely, the exporter omits it.
 
@@ -36,6 +39,7 @@ If a relationship is not explicit enough to establish safely, the exporter omits
 A causal graph artifact can help answer:
 
 - Which objective started the chain?
+- Whether a constrained proposal was accepted or rejected before becoming kernel work.
 - Which decision emitted a task?
 - Which task was assigned to a worker?
 - Which scheduler output selected a worker action?
@@ -47,6 +51,23 @@ The scheduled-mining artifact demonstrates the current chain:
 
 ```text
 Objective
+-> Decision
+-> Task
+-> Assignment
+-> Scheduler decision
+-> Policy decision
+-> Worker action
+-> State transition
+-> Replay verification
+```
+
+The proposal-adaptor artifact demonstrates the additional proposal boundary:
+
+```text
+Proposal received
+-> Proposal parsed
+-> Proposal accepted or rejected
+-> Objective
 -> Decision
 -> Task
 -> Assignment
@@ -88,6 +109,8 @@ It does not provide:
 - File-backed event logs.
 - General causal inference.
 - Planner reasoning.
+- Live model behavior.
+- Proposal parsing or validation replay.
 - Policy replay validation.
 - Scheduler replay validation.
 - Production audit guarantees.

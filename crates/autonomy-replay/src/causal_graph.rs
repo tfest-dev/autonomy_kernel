@@ -2,8 +2,9 @@ use std::collections::BTreeMap;
 
 use autonomy_core::{AssignmentId, DecisionId, EventId, ObjectiveId, TaskId};
 use autonomy_sim::{
-    Assignment, Decision, DecisionKind, Objective, ObjectiveKind, PolicyError, ResourceKind,
-    ScheduleOutcome, Task, TaskKind, WorkerAction,
+    Assignment, Decision, DecisionKind, Objective, ObjectiveKind, ParsedProposal, PolicyError,
+    ProposalRejection, ProposedObjective, ResourceKind, ScheduleOutcome, Task, TaskKind,
+    WorkerAction,
 };
 
 use crate::event_log::{EventEnvelope, EventKind};
@@ -52,6 +53,9 @@ pub struct CausalNode {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CausalNodeKind {
+    Proposal,
+    ProposalAccepted,
+    ProposalRejected,
     Objective,
     Decision,
     Task,
@@ -92,6 +96,14 @@ pub fn build_causal_graph(events: &[EventEnvelope], replay_verified: bool) -> Ca
 
     for event in events {
         match &event.kind {
+            EventKind::ProposalReceived { text } => builder.add_proposal_received(event, text),
+            EventKind::ProposalParsed { proposal } => builder.add_proposal_parsed(event, proposal),
+            EventKind::ProposalAccepted { proposal } => {
+                builder.add_proposal_accepted(event, proposal)
+            }
+            EventKind::ProposalRejected { rejection } => {
+                builder.add_proposal_rejected(event, rejection)
+            }
             EventKind::ObjectiveAccepted { objective } => builder.add_objective(event, objective),
             EventKind::DecisionEmitted { decision } => builder.add_decision(event, decision),
             EventKind::TaskCreated { task } => builder.add_task(event, task),
@@ -222,6 +234,9 @@ pub fn export_causal_graph_lines(graph: &CausalGraph) -> String {
 
 pub fn node_kind_name(kind: CausalNodeKind) -> &'static str {
     match kind {
+        CausalNodeKind::Proposal => "Proposal",
+        CausalNodeKind::ProposalAccepted => "ProposalAccepted",
+        CausalNodeKind::ProposalRejected => "ProposalRejected",
         CausalNodeKind::Objective => "Objective",
         CausalNodeKind::Decision => "Decision",
         CausalNodeKind::Task => "Task",
@@ -264,6 +279,9 @@ struct GraphBuilder {
     latest_policy: BTreeMap<AssignmentId, CausalNodeId>,
     latest_action: BTreeMap<AssignmentId, CausalNodeId>,
     latest_action_request: Option<CausalNodeId>,
+    latest_proposal_received: Option<CausalNodeId>,
+    latest_proposal_parsed: Option<CausalNodeId>,
+    pending_proposal_accepted: Option<CausalNodeId>,
     pending_failure: Option<PendingWorkerEvent>,
     pending_recovery: Option<PendingWorkerEvent>,
     last_relevant_node: Option<CausalNodeId>,
@@ -283,6 +301,9 @@ impl GraphBuilder {
             latest_policy: BTreeMap::new(),
             latest_action: BTreeMap::new(),
             latest_action_request: None,
+            latest_proposal_received: None,
+            latest_proposal_parsed: None,
+            pending_proposal_accepted: None,
             pending_failure: None,
             pending_recovery: None,
             last_relevant_node: None,
@@ -296,6 +317,60 @@ impl GraphBuilder {
             Some(event.id),
         );
         self.objectives.insert(objective.id, node_id);
+        if let Some(proposal) = self.pending_proposal_accepted.take() {
+            self.add_edge(proposal, node_id, CausalEdgeKind::Caused);
+        }
+        self.last_relevant_node = Some(node_id);
+    }
+
+    fn add_proposal_received(&mut self, event: &EventEnvelope, text: &str) {
+        let node_id = self.add_node(
+            CausalNodeKind::Proposal,
+            format!("ProposalReceived {}", proposal_text_label(text)),
+            Some(event.id),
+        );
+        self.latest_proposal_received = Some(node_id);
+        self.latest_proposal_parsed = None;
+        self.last_relevant_node = Some(node_id);
+    }
+
+    fn add_proposal_parsed(&mut self, event: &EventEnvelope, proposal: &ParsedProposal) {
+        let node_id = self.add_node(
+            CausalNodeKind::Proposal,
+            format!("ProposalParsed {}", parsed_proposal_label(proposal)),
+            Some(event.id),
+        );
+        if let Some(received) = self.latest_proposal_received {
+            self.add_edge(received, node_id, CausalEdgeKind::Emitted);
+        }
+        self.latest_proposal_parsed = Some(node_id);
+        self.last_relevant_node = Some(node_id);
+    }
+
+    fn add_proposal_accepted(&mut self, event: &EventEnvelope, proposal: &ParsedProposal) {
+        let node_id = self.add_node(
+            CausalNodeKind::ProposalAccepted,
+            format!("ProposalAccepted {}", parsed_proposal_label(proposal)),
+            Some(event.id),
+        );
+        if let Some(parsed) = self.latest_proposal_parsed {
+            self.add_edge(parsed, node_id, CausalEdgeKind::Emitted);
+        }
+        self.pending_proposal_accepted = Some(node_id);
+        self.last_relevant_node = Some(node_id);
+    }
+
+    fn add_proposal_rejected(&mut self, event: &EventEnvelope, rejection: &ProposalRejection) {
+        let node_id = self.add_node(
+            CausalNodeKind::ProposalRejected,
+            format!("ProposalRejected {}", proposal_rejection_label(rejection)),
+            Some(event.id),
+        );
+        if let Some(parsed) = self.latest_proposal_parsed {
+            self.add_edge(parsed, node_id, CausalEdgeKind::Emitted);
+        } else if let Some(received) = self.latest_proposal_received {
+            self.add_edge(received, node_id, CausalEdgeKind::Emitted);
+        }
         self.last_relevant_node = Some(node_id);
     }
 
@@ -686,6 +761,32 @@ fn policy_error_label(error: &PolicyError) -> String {
     }
 }
 
+fn parsed_proposal_label(proposal: &ParsedProposal) -> String {
+    match proposal.objective {
+        ProposedObjective::MaintainStockpile { resource, minimum } => format!(
+            "MaintainStockpile {} >= {} worker={} node={} storage={} mine_qty={}",
+            resource_label(resource),
+            minimum.value(),
+            proposal.worker_id.value(),
+            proposal.resource_node_id.value(),
+            proposal.storage_id.value(),
+            proposal.mine_quantity.value()
+        ),
+    }
+}
+
+fn proposal_text_label(text: &str) -> String {
+    let line_count = text.lines().count();
+    format!("lines={line_count}")
+}
+
+fn proposal_rejection_label(rejection: &ProposalRejection) -> String {
+    match rejection {
+        ProposalRejection::Parse(error) => format!("Parse {error}"),
+        ProposalRejection::Validation(error) => format!("Validation {error}"),
+    }
+}
+
 fn resource_label(resource: ResourceKind) -> &'static str {
     match resource {
         ResourceKind::Iron => "Iron",
@@ -716,7 +817,10 @@ mod tests {
             build_causal_graph, export_causal_graph_lines, export_causal_graph_text,
             CausalEdgeKind, CausalGraph, CausalNode, CausalNodeKind,
         },
-        scenario::{run_policy_gate, run_scheduled_mining, run_worker_failure_recovery},
+        scenario::{
+            run_policy_gate, run_proposal_adaptor, run_scheduled_mining,
+            run_worker_failure_recovery,
+        },
     };
 
     #[test]
@@ -832,6 +936,41 @@ mod tests {
             .edges
             .iter()
             .any(|edge| edge.to == replay.id && edge.kind == CausalEdgeKind::VerifiedByReplay));
+    }
+
+    #[test]
+    fn proposal_adaptor_graph_includes_accepted_and_rejected_proposal_nodes() {
+        let run = run_proposal_adaptor().expect("proposal-adaptor should run");
+        let graph = build_causal_graph(&run.events, true);
+
+        assert!(has_node_kind(&graph, CausalNodeKind::Proposal));
+        assert!(has_node_kind(&graph, CausalNodeKind::ProposalAccepted));
+        assert!(has_node_kind(&graph, CausalNodeKind::ProposalRejected));
+    }
+
+    #[test]
+    fn proposal_adaptor_graph_links_accepted_proposal_to_objective() {
+        let run = run_proposal_adaptor().expect("proposal-adaptor should run");
+        let graph = build_causal_graph(&run.events, false);
+
+        let accepted = node_with_label(&graph, "ProposalAccepted");
+        let objective = node_with_label(&graph, "MaintainStockpile Iron >= 10 objective=1");
+
+        assert_has_edge(&graph, accepted, objective, CausalEdgeKind::Caused);
+    }
+
+    #[test]
+    fn proposal_rejected_does_not_create_action_or_state_transition_edges() {
+        let run = run_proposal_adaptor().expect("proposal-adaptor should run");
+        let graph = build_causal_graph(&run.events[..2], false);
+
+        assert!(has_node_kind(&graph, CausalNodeKind::ProposalRejected));
+        assert!(!has_node_kind(&graph, CausalNodeKind::Action));
+        assert!(!has_node_kind(&graph, CausalNodeKind::StateTransition));
+        assert!(!graph.edges.iter().any(|edge| matches!(
+            edge.kind,
+            CausalEdgeKind::RequestedAction | CausalEdgeKind::AppliedAction
+        )));
     }
 
     #[test]
