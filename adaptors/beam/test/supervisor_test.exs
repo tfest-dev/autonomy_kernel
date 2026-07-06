@@ -26,7 +26,7 @@ defmodule AutonomyKernelBeam.SupervisorTest do
       request_id: "after-restart"
     }
 
-    assert %{status: :accepted, request_id: "after-restart"} =
+    assert %{status: :ok, request_id: "after-restart"} =
              ScenarioWorker.run_scenario(ScenarioWorker, request)
   end
 
@@ -42,14 +42,19 @@ defmodule AutonomyKernelBeam.SupervisorTest do
     refute :ssl in extra_applications
   end
 
-  test "adaptor source does not execute shell commands or ports" do
+  test "adapter source only uses the dedicated Rust CLI process boundary" do
     source =
       "lib/**/*.ex"
       |> Path.wildcard()
       |> Enum.map_join("\n", &File.read!/1)
 
-    refute source =~ "System.cmd"
+    assert source =~ "System.cmd"
+    refute source =~ "System.shell"
+    refute source =~ ":os.cmd"
     refute source =~ "Port.open"
+    refute source =~ "Rustler"
+    refute source =~ "\"sh\""
+    refute source =~ "\"-c\""
   end
 
   defp wait_for_restarted_worker(old_worker, attempts \\ 20)

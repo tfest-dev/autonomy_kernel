@@ -4,7 +4,7 @@ Autonomy Kernel is a deterministic control substrate for AI-operated distributed
 
 It allows high-level intent to be decomposed into bounded, traceable, semi-autonomous execution while preserving repeatability, auditability, failure isolation, and constraint enforcement.
 
-Status: initial Rust workspace with deterministic world-state, in-memory action event log, replay skeleton, causal objective/task lineage, fixed mining bootstrap scenario, deterministic local failure/recovery scenario, deterministic policy gates, a minimal deterministic scheduler, deterministic causal graph artifacts, a constrained proposal adaptor boundary, an optional BEAM supervision adaptor experiment, and a deterministic Rust CLI boundary. Live model calls, general planning, persistence, distributed supervision, UI, and integrations have not started.
+Status: initial Rust workspace with deterministic world-state, in-memory action event log, replay skeleton, causal objective/task lineage, fixed mining bootstrap scenario, deterministic local failure/recovery scenario, deterministic policy gates, a minimal deterministic scheduler, deterministic causal graph artifacts, a constrained proposal adaptor boundary, an optional BEAM supervision adaptor experiment, a deterministic Rust CLI boundary, and a controlled BEAM-to-Rust CLI process boundary. Live model calls, general planning, persistence, distributed supervision, UI, and integrations have not started.
 
 ## Project Purpose
 
@@ -23,9 +23,9 @@ Reasoning and execution are separate concerns. Proposals may originate from a pl
 
 The current proposal adaptor is local and deterministic. It parses a constrained line-based input format into structured proposal data, validates references against the current world state, and records proposal acceptance or rejection. It does not call an LLM or any external provider.
 
-The optional BEAM adaptor is a supervision boundary experiment only. Rust remains the deterministic kernel and owns state, replay, scheduler, policy, reducer, proposal, event, and artifact semantics. The BEAM adaptor currently acknowledges deterministic scenario-style requests and demonstrates process supervision; it does not execute Rust.
+The optional BEAM adaptor is a supervision boundary experiment only. Rust remains the deterministic kernel and owns state, replay, scheduler, policy, reducer, proposal, event, and artifact semantics. The BEAM adaptor can invoke the Rust CLI for allowlisted scenario and artifact requests through a controlled external process boundary; it does not use NIFs, FFI, HTTP, networking, or shell strings. 
 
-The Rust CLI provides deterministic commands for listing known scenarios, running known scenarios, and exporting causal artifacts. It is intended as a future process boundary for external supervisors, but currently does not make any adaptor call it. 
+The Rust CLI provides deterministic commands for listing known scenarios, running known scenarios, and exporting causal artifacts. It is the external execution interface used by the optional BEAM adaptor boundary. 
 
 ## Problem Statement
 
@@ -92,13 +92,13 @@ The first causal graph artifact export derives an inspectable decision chain fro
 - No realistic robotics physics in V1.
 - No graphics-heavy user interface in V1.
 - No graph viewer in the current implementation.
-- No BEAM ownership of kernel state, replay, policy, scheduler, or event semantics.
+- No BEAM ownership of kernel state, replay, policy, scheduler, proposal, artifact, or event semantics.
 - No uncontrolled worker tool execution.
 - No claim that the system is production-ready or generally safe.
 
 ## Repository Status
 
-This repository currently contains the initial public documentation, Rust workspace, deterministic core primitives, minimal grid-world state/reducer types, the first in-memory event sourcing and replay layer, causal event records for objectives, decisions, tasks, assignments, assigned worker actions, deterministic mining bootstrap scenario, deterministic worker failure/recovery scenario, deterministic policy-aware action recording, a minimal scheduler for existing mining/deposit tasks, deterministic causal graph artifact export, a constrained proposal-adaptor scenario, and an optional Elixir OTP adaptor scaffold. General planners, live LLM calls, persistence, UI, distributed runtimes, and integrations have not started. 
+This repository currently contains the initial public documentation, Rust workspace, deterministic core primitives, minimal grid-world state/reducer types, the first in-memory event sourcing and replay layer, causal event records for objectives, decisions, tasks, assignments, assigned worker actions, deterministic mining bootstrap scenario, deterministic worker failure/recovery scenario, deterministic policy-aware action recording, a minimal scheduler for existing mining/deposit tasks, deterministic causal graph artifact export, a constrained proposal-adaptor scenario, an optional Elixir OTP adaptor scaffold, a deterministic Rust CLI for scenario execution and artifact export, and a controlled BEAM-to-Rust CLI boundary. General planners, live LLM calls, persistence, UI, distributed runtimes, and integrations have not started. 
 
 ## Roadmap Summary
 

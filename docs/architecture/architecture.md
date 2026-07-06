@@ -54,9 +54,9 @@ The supervision layer observes execution, detects failures, coordinates retries 
 
 Future supervision layers may use fault-tolerant message-passing runtimes, but V1 does not commit to a specific runtime or language ecosystem.
 
-Added an optional BEAM/Elixir adaptor experiment under `adaptors/beam`. It demonstrates adaptor-level OTP supervision for deterministic scenario-style request messages. It does not move kernel logic into BEAM. Rust remains authoritative for world state, reducer semantics, policy gates, scheduler output, proposal validation, event interpretation, replay, and causal graph artifacts. The BEAM adaptor does not execute Rust through ports, NIFs, FFI, HTTP, or shell commands. 
+Added an optional BEAM/Elixir adaptor experiment under `adaptors/beam`. It demonstrates adaptor-level OTP supervision for deterministic scenario-style request messages. It does not move kernel logic into BEAM. Rust remains authoritative for world state, reducer semantics, policy gates, scheduler output, proposal validation, event interpretation, replay, and causal graph artifacts. The BEAM adaptor does not execute Rust through ports, NIFs, FFI, or HTTP. 
 
-`autonomy-cli` adds a deterministic Rust CLI boundary that exposes known scenario execution and causal artifact export as stable process output. It does not add networking, persistence, an interactive UI, or BEAM-to-Rust invocation.
+`autonomy-cli` adds a deterministic Rust CLI boundary that exposes known scenario execution and causal artifact export as stable process output. It does not add networking, persistence, an interactive UI, or BEAM-to-Rust invocation. The adaptor is now connected to the Rust CLI through a controlled external process boundary. The adaptor allowlists scenario names and artifact formats, invokes `cargo run -p autonomy-cli -- ...` with argument-list process calls, and parses deterministic CLI output. It does not own state, replay, scheduler, policy, proposal, artifact, or event semantics. 
 
 ## Worker Runtime
 
@@ -97,4 +97,4 @@ Causal graph artifacts for inspection now added. Does not add UI, graph viewer, 
 
 Deterministic proposal adaptor boundary in place. It does not add live LLM calls, prompt templates, provider routing, automatic natural-language planning, or automatic task decomposition beyond explicit conversion of accepted structured proposals. Adaptor-level supervision also now added with the optional BEAM integration. It does not add distributed BEAM clustering, production orchestration, networking, persistence, or cross-runtime execution. 
 
-CLI process output only implementation. External adaptors may call this CLI in future work, but no adaptor invocation path is implemented yet.
+CLI process output only implementation. The optional BEAM adaptor is now allowed to call the CLI through an allowlisted process boundary, but it does not add distributed BEAM clustering, NIFs, FFI, networking, persistence, or production orchestration. 

@@ -18,7 +18,7 @@ Added deterministic causal graph artifacts derived from recorded scenario event 
 
 `proposal-adaptor`, a deterministic scenario for the local proposal boundary, now implemented. It records a rejected constrained proposal, records an accepted constrained proposal, converts the accepted proposal into lifecycle records, then executes through the existing scheduler and policy gates.
 
-BEAM supervision adaptor experiment added as optional add-on. It supervises a scenario-worker process that returns deterministic boundary responses for known scenario names. It does not execute Rust scenarios or change simulation semantics. A deterministic Rust command-line boundary for listing scenarios, running known scenarios, and exporting causal artifacts is included under `autonomy-cli`. It uses existing scenario and artifact APIs and does not change simulation semantics. 
+BEAM supervision adaptor experiment added as optional add-on. It supervises a scenario-worker process at the adaptor boundary and does not change simulation semantics. It does not execute Rust scenarios or change simulation semantics. A deterministic Rust command-line boundary for listing scenarios, running known scenarios, and exporting causal artifacts is included under `autonomy-cli`. It uses existing scenario and artifact APIs and does not change simulation semantics. These two connect through an allowlisted process boundary. Rust remains authoritative for scenario execution, replay, policy, scheduler, proposal, and artifact semantics.
 
 ## Included in V1
 
@@ -43,6 +43,7 @@ V1 includes:
     - Deterministic causal graph artifact export for recorded event streams.
     - Optional BEAM adaptor scaffold for supervision-boundary experimentation.
     - Deterministic Rust CLI boundary for scenario execution and causal artifact export.
+    - Controlled BEAM-to-Rust CLI invocation for allowlisted scenario and artifact requests.
 
 ## Excluded from V1
 
@@ -64,7 +65,7 @@ V1 excludes:
     - General planner or automatic objective decomposition.
     - Full pathfinding or route planning.
     - Graph viewer or interactive UI.
-    - Rust execution through BEAM ports, NIFs, FFI, HTTP, or shell commands.
+    - Rust execution through BEAM ports, NIFs, FFI, HTTP, networking, or shell strings.
     - CLI networking, persistence, interactive UI, or dynamic scenario loading.
 
 ## Initial Scenario Shape
@@ -88,6 +89,7 @@ The grid world should provide enough complexity to expose coordination problems 
     - Policy gates.
     - Optional adaptor-level BEAM supervision boundary.
     - Deterministic CLI output for known scenario runs and artifacts.
+    - Allowlisted BEAM-to-Rust CLI process invocation.
     - Minimal scheduler output for existing assignments.
     - Causal graph extraction from event streams.
     - Failure reporting.

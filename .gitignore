@@ -13,3 +13,5 @@ artifacts/runs/*
 adaptors/beam/_build/
 adaptors/beam/deps/
 adaptors/beam/*.ez
+!adaptors/beam/lib/
+!adaptors/beam/lib/**

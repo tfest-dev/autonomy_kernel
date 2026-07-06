@@ -61,7 +61,7 @@ The causal graph artifacts are derived from those audit events. These artifacts 
 
 Proposal acceptance and rejection is recorded as first-class audit events. Proposal events are replay-compatible audit facts and do not perform state reconstruction.
 
-Optional BEAM supervision adaptor experiment added which demonstrates process restart behavior at the adaptor boundary but does not own kernel state, policy decisions, scheduler decisions, replay, event semantics, or execution. Rust remains the deterministic authority.
+Optional BEAM supervision adaptor experiment added which demonstrates process restart behavior at the adaptor boundary but does not own kernel state, policy decisions, scheduler decisions, replay, event semantics, or execution. Rust remains the deterministic authority. The optional BEAM adaptor is allowed to invoke the Rust CLI through a controlled process boundary. Unsupported inputs are rejected before invocation, commands are built from fixed argument lists, and Rust remains authoritative for state, policy, scheduler, proposal, replay, and artifact semantics.
 
 ## Audit and Diagnosis
 
@@ -69,4 +69,4 @@ Audit and replay support diagnosis by preserving the causal chain from objective
 
 The safety model depends on durable evidence, deterministic interpretation, and explicit boundaries rather than trust in any single component.
 
-The BEAM adaptor is not a production supervision system at this stage. It does not add clustering, networking, persistence, FFI, ports, or distributed runtime semantics. 
+The BEAM adaptor is not a production supervision system. It does not add clustering, networking, persistence, FFI, NIFs, ports, or distributed runtime semantics. 

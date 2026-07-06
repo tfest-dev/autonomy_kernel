@@ -2,13 +2,13 @@
 
 A minimal deterministic Rust command-line boundary for known Autonomy Kernel scenarios.
 
-The CLI is an external process interface over existing Rust scenario and artifact APIs. It does not change kernel semantics and does not introduce networking, persistence, UI, live model calls, or BEAM invocation.
+The CLI is an external process interface over existing Rust scenario and artifact APIs. It does not change kernel semantics and does not introduce networking, persistence, UI, or live model calls.
 
 ## Purpose
 
-The CLI provides stable commands that external supervisors can invoke in later work. It gives a narrow way to run known deterministic scenarios and export causal artifacts while keeping replay, policy, scheduler, proposal, reducer, and event authority inside Rust.
+The CLI provides stable commands that external supervisors can invoke. It gives a narrow way to run known deterministic scenarios and export causal artifacts while keeping replay, policy, scheduler, proposal, reducer, and event authority inside Rust. It does not make the optional BEAM adaptor call the CLI. It only creates the Rust process boundary that such adaptors may use later.
 
-It does not make the optional BEAM adaptor call the CLI. It only creates the Rust process boundary that such adaptors may use later.
+Connection is now provided optionally through the BEAM adaptor to the CLI using a controlled process boundary. The adaptor allowlists scenario names and artifact formats before invoking the CLI and uses argument-list process calls rather than shell strings.
 
 ## Commands
 
@@ -98,6 +98,7 @@ The CLI does not:
     - Persist event logs or artifacts.
     - Provide an interactive UI.
     - Call live LLM providers.
+    - Transfer kernel authority to the BEAM adaptor.
     - Invoke or modify the BEAM adaptor.
     - Implement planning or new scenario semantics.
 
